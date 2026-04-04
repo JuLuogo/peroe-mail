@@ -78,9 +78,8 @@ const sesService = {
         let secretKey = sesSecretKey;
 
         if (sesTokens[domain]) {
-            const domainConfig = JSON.parse(sesTokens[domain]);
-            accessKey = domainConfig.accessKey || accessKey;
-            secretKey = domainConfig.secretKey || secretKey;
+            // sesTokens[domain] 直接就是 secret key，和 resendTokens 格式一样
+            secretKey = sesTokens[domain];
         }
 
         const region = sesRegion || 'us-east-1';

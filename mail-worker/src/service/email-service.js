@@ -231,21 +231,23 @@ const emailService = {
 
 		const domain = emailUtils.getDomain(accountRow.email);
 		const resendToken = resendTokens[domain];
+		const sesToken = sesTokens[domain];
 		const isSesEnabled = sesEnabled === 1;
 		const hasSesConfig = sesAccessKey && sesSecretKey && sesRegion;
+		const hasDomainSesToken = !!sesToken;
 
 		//判断使用哪种发送方式
 		let sendMethod = 'resend';
-		if (isSesEnabled && hasSesConfig) {
-			// 如果启用了 SES 并且有配置，优先使用 SES
+
+		if (resendToken) {
+			// 如果有该域名的 Resend token，优先使用 Resend
+			sendMethod = 'resend';
+		} else if (hasDomainSesToken || (isSesEnabled && hasSesConfig)) {
+			// 如果没有 Resend token，但有该域名的 SES token 或全局 SES 配置，使用 SES
 			sendMethod = 'ses';
-		} else if (!resendToken && !allInternal) {
-			// 如果没有 Resend token 但需要发送到站外，检查是否有 SES 配置
-			if (isSesEnabled && hasSesConfig) {
-				sendMethod = 'ses';
-			} else {
-				throw new BizError(t('noResendToken'));
-			}
+		} else if (!allInternal) {
+			// 如果需要发送到站外但没有任何配置，抛出错误
+			throw new BizError(t('noResendToken'));
 		}
 
 		//没有发件人名字自动截取
