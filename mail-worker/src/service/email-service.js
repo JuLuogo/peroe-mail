@@ -164,7 +164,7 @@ const emailService = {
 			attachments //附件
 		} = params;
 
-		const { resendTokens, r2Domain, send, domainList, sesEnabled, sesAccessKey, sesSecretKey, sesRegion, sesTokens } = await settingService.query(c);
+		const { resendTokens, r2Domain, send, domainList, sesEnabled, sesAccessKey, sesSecretKey, sesRegion, sesTokens, sendMethodConfig } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
