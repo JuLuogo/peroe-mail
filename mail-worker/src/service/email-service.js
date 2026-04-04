@@ -21,6 +21,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import sesService from './ses-service.js';
 
 const emailService = {
 
@@ -294,7 +295,6 @@ const emailService = {
 				sendResult = await resend.emails.send(sendForm);
 
 			} else if (sendMethod === 'ses') {
-				const sesService = await import('./ses-service.js').then(mod => mod.default);
 
 				const sendForm = {
 					from: `${name} <${accountRow.email}>`,
