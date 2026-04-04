@@ -29,6 +29,7 @@ const dbInit = {
 		await this.v2_8DB(c);
 		await this.v2_9DB(c);
 		await this.v2_10DB(c);
+		await this.v2_11DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -42,6 +43,14 @@ const dbInit = {
 				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN ses_enabled INTEGER NOT NULL DEFAULT 0;`),
 				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN ses_tokens text NOT NULL DEFAULT '{}';`)
 			]);
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v2_11DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN send_method_config text NOT NULL DEFAULT '{}';`).run();
 		} catch (e) {
 			console.warn(`跳过字段：${e.message}`);
 		}

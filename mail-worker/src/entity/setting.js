@@ -51,6 +51,7 @@ export const setting = sqliteTable('setting', {
 	sesSecretKey: text('ses_secret_key').default('').notNull(),
 	sesRegion: text('ses_region').default('').notNull(),
 	sesEnabled: integer('ses_enabled').default(0).notNull(),
-	sesTokens: text('ses_tokens').default("{}").notNull()
+	sesTokens: text('ses_tokens').default("{}").notNull(),
+	sendMethodConfig: text('send_method_config').default("{}").notNull()
 });
 export default setting

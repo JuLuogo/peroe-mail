@@ -15,6 +15,7 @@ const settingService = {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		settingRow.sesTokens = JSON.parse(settingRow.sesTokens);
+		settingRow.sendMethodConfig = JSON.parse(settingRow.sendMethodConfig);
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -161,12 +162,18 @@ const settingService = {
 			if (!sesTokens[domain]) delete sesTokens[domain];
 		});
 
+		let sendMethodConfig = { ...settingData.sendMethodConfig, ...params.sendMethodConfig };
+		Object.keys(sendMethodConfig).forEach(domain => {
+			if (!sendMethodConfig[domain]) delete sendMethodConfig[domain];
+		});
+
 		if (Array.isArray(params.emailPrefixFilter)) {
 			params.emailPrefixFilter = params.emailPrefixFilter + '';
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
 		params.sesTokens = JSON.stringify(sesTokens);
+		params.sendMethodConfig = JSON.stringify(sendMethodConfig);
 		await orm(c).update(setting).set({ ...params }).returning().get();
 		await this.refresh(c);
 	},

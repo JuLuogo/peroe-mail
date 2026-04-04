@@ -612,6 +612,15 @@
         <el-table :data="resendList">
           <el-table-column :min-width="emailColumnWidth" property="key" :label="$t('domain')"
                            :show-overflow-tooltip="true"/>
+          <el-table-column :width="120" label="发送方式" fixed="right">
+            <template #default="scope">
+              <el-select v-model="scope.row.sendMethod" @change="changeSendMethod(scope.row.key, scope.row.sendMethod)" size="small">
+                <el-option label="自动选择" value="auto"/>
+                <el-option label="Resend" value="resend"/>
+                <el-option label="SES" value="ses"/>
+              </el-select>
+            </template>
+          </el-table-column>
           <el-table-column :width="tokenColumnWidth" property="value" label="Token" fixed="right"
                            :show-overflow-tooltip="true"/>
         </el-table>
@@ -936,7 +945,8 @@ const resendList = computed(() => {
   let list = Object.keys(setting.value.resendTokens).map(key => {
     return {
       key: key,
-      value: setting.value.resendTokens[key]
+      value: setting.value.resendTokens[key],
+      sendMethod: setting.value.sendMethodConfig?.[key] || 'auto'
     };
   })
 
@@ -1281,6 +1291,14 @@ function saveResendToken() {
   }
   const domain = resendTokenForm.domain.slice(1)
   settingForm.resendTokens[domain] = resendTokenForm.token
+  editSetting(settingForm)
+}
+
+function changeSendMethod(domain, sendMethod) {
+  const settingForm = {
+    sendMethodConfig: {}
+  }
+  settingForm.sendMethodConfig[domain] = sendMethod
   editSetting(settingForm)
 }
 

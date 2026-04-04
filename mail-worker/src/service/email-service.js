@@ -239,15 +239,21 @@ const emailService = {
 		//判断使用哪种发送方式
 		let sendMethod = 'resend';
 
-		if (resendToken) {
-			// 如果有该域名的 Resend token，优先使用 Resend
-			sendMethod = 'resend';
-		} else if (hasDomainSesToken || (isSesEnabled && hasSesConfig)) {
-			// 如果没有 Resend token，但有该域名的 SES token 或全局 SES 配置，使用 SES
-			sendMethod = 'ses';
-		} else if (!allInternal) {
-			// 如果需要发送到站外但没有任何配置，抛出错误
-			throw new BizError(t('noResendToken'));
+		// 首先检查是否有该域名的发送方式配置
+		if (sendMethodConfig[domain] && sendMethodConfig[domain] !== 'auto') {
+			sendMethod = sendMethodConfig[domain];
+		} else {
+			// 如果是 auto 或者没有配置，走自动选择逻辑
+			if (resendToken) {
+				// 如果有该域名的 Resend token，默认使用 Resend
+				sendMethod = 'resend';
+			} else if (hasDomainSesToken || (isSesEnabled && hasSesConfig)) {
+				// 如果没有 Resend token，但有该域名的 SES token 或全局 SES 配置，使用 SES
+				sendMethod = 'ses';
+			} else if (!allInternal) {
+				// 如果需要发送到站外但没有任何配置，抛出错误
+				throw new BizError(t('noResendToken'));
+			}
 		}
 
 		//没有发件人名字自动截取
