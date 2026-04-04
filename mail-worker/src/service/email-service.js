@@ -163,7 +163,7 @@ const emailService = {
 			attachments //附件
 		} = params;
 
-		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
+		const { resendTokens, r2Domain, send, domainList, sesEnabled, sesAccessKey, sesSecretKey, sesRegion, sesTokens } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
@@ -230,10 +230,21 @@ const emailService = {
 
 		const domain = emailUtils.getDomain(accountRow.email);
 		const resendToken = resendTokens[domain];
+		const isSesEnabled = sesEnabled === 1;
+		const hasSesConfig = sesAccessKey && sesSecretKey && sesRegion;
 
-		//如果接收方存在站外邮箱，又没有resend token
-		if (!resendToken && !allInternal) {
-			throw new BizError(t('noResendToken'));
+		//判断使用哪种发送方式
+		let sendMethod = 'resend';
+		if (isSesEnabled && hasSesConfig) {
+			// 如果启用了 SES 并且有配置，优先使用 SES
+			sendMethod = 'ses';
+		} else if (!resendToken && !allInternal) {
+			// 如果没有 Resend token 但需要发送到站外，检查是否有 SES 配置
+			if (isSesEnabled && hasSesConfig) {
+				sendMethod = 'ses';
+			} else {
+				throw new BizError(t('noResendToken'));
+			}
 		}
 
 		//没有发件人名字自动截取
@@ -256,35 +267,57 @@ const emailService = {
 
 		}
 
-		let resendResult = {};
+		let sendResult = {};
 
-		//存在站外时邮箱全部由resend发送
+		//存在站外时邮箱由配置的发送方式发送
 		if (!allInternal) {
 
-			const resend = new Resend(resendToken);
+			if (sendMethod === 'resend') {
+				const resend = new Resend(resendToken);
 
-			const sendForm = {
-				from: `${name} <${accountRow.email}>`,
-				to: [...receiveEmail],
-				subject: subject,
-				text: text,
-				html: html,
-				attachments: [...imageDataList, ...attachments]
-			};
-
-			if (sendType === 'reply') {
-				sendForm.headers = {
-					'in-reply-to': emailRow.messageId,
-					'references': emailRow.messageId
+				const sendForm = {
+					from: `${name} <${accountRow.email}>`,
+					to: [...receiveEmail],
+					subject: subject,
+					text: text,
+					html: html,
+					attachments: [...imageDataList, ...attachments]
 				};
-			}
 
-			resendResult = await resend.emails.send(sendForm);
+				if (sendType === 'reply') {
+					sendForm.headers = {
+						'in-reply-to': emailRow.messageId,
+						'references': emailRow.messageId
+					};
+				}
+
+				sendResult = await resend.emails.send(sendForm);
+
+			} else if (sendMethod === 'ses') {
+				const sesService = await import('./ses-service.js').then(mod => mod.default);
+
+				const sendForm = {
+					from: `${name} <${accountRow.email}>`,
+					to: [...receiveEmail],
+					subject: subject,
+					text: text,
+					html: html,
+					attachments: [...imageDataList, ...attachments]
+				};
+
+				if (sendType === 'reply') {
+					sendForm.headers = {
+						'in-reply-to': emailRow.messageId,
+						'references': emailRow.messageId
+					};
+				}
+
+				sendResult = await sesService.sendEmail(c, sendForm);
+			}
 
 		}
 
-		const { data, error } = resendResult;
-
+		const { data, error } = sendResult;
 
 		if (error) {
 			throw new BizError(error.message);

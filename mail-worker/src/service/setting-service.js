@@ -14,6 +14,7 @@ const settingService = {
 	async refresh(c) {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
+		settingRow.sesTokens = JSON.parse(settingRow.sesTokens);
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -99,8 +100,14 @@ const settingService = {
 			settingRow.resendTokens[key] = `${settingRow.resendTokens[key].slice(0, 12)}******`;
 		});
 
+		Object.keys(settingRow.sesTokens).forEach(key => {
+			settingRow.sesTokens[key] = `${settingRow.sesTokens[key].slice(0, 12)}******`;
+		});
+
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
 		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
+		settingRow.sesAccessKey = settingRow.sesAccessKey ? `${settingRow.sesAccessKey.slice(0, 12)}******` : null;
+		settingRow.sesSecretKey = settingRow.sesSecretKey ? `${settingRow.sesSecretKey.slice(0, 12)}******` : null;
 		settingRow.hasR2 = !!c.env.r2
 
 		let regVerifyOpen = false
@@ -130,11 +137,17 @@ const settingService = {
 			if (!resendTokens[domain]) delete resendTokens[domain];
 		});
 
+		let sesTokens = { ...settingData.sesTokens, ...params.sesTokens };
+		Object.keys(sesTokens).forEach(domain => {
+			if (!sesTokens[domain]) delete sesTokens[domain];
+		});
+
 		if (Array.isArray(params.emailPrefixFilter)) {
 			params.emailPrefixFilter = params.emailPrefixFilter + '';
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
+		params.sesTokens = JSON.stringify(sesTokens);
 		await orm(c).update(setting).set({ ...params }).returning().get();
 		await this.refresh(c);
 	},

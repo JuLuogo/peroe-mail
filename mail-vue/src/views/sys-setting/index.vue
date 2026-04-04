@@ -189,6 +189,21 @@
                   </el-button>
                 </div>
               </div>
+              <div class="setting-item">
+                <div><span>{{ $t('sesEnabled') }}</span></div>
+                <div>
+                  <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                             v-model="setting.sesEnabled"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('sesConfig') }}</span></div>
+                <div class="forward">
+                  <el-button class="opt-button" size="small" type="primary" @click="openSesForm">
+                    <Icon icon="fluent:settings-48-regular" width="18" height="18"/>
+                  </el-button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -728,6 +743,14 @@
         </div>
         <el-button type="primary" style="width: 100%;" :loading="settingLoading" @click="saveEmailPrefix">{{ $t('save') }}</el-button>
       </el-dialog>
+      <el-dialog v-model="sesFormShow" :title="$t('sesConfig')" width="340" @closed="cleanSesForm">
+        <form>
+          <el-input class="dialog-input" type="text" placeholder="SES Access Key" v-model="sesForm.sesAccessKey"/>
+          <el-input class="dialog-input" type="text" placeholder="SES Secret Key" v-model="sesForm.sesSecretKey"/>
+          <el-input class="dialog-input" type="text" placeholder="SES Region (e.g. us-east-1)" v-model="sesForm.sesRegion"/>
+          <el-button type="primary" :loading="settingLoading" @click="saveSesConfig">{{ $t('save') }}</el-button>
+        </form>
+      </el-dialog>
     </el-scrollbar>
   </div>
 </template>
@@ -808,6 +831,13 @@ const s3 = reactive({
   s3AccessKey: '',
   s3SecretKey: '',
   forcePathStyle: 1
+})
+
+const sesFormShow = ref(false)
+const sesForm = reactive({
+  sesAccessKey: '',
+  sesSecretKey: '',
+  sesRegion: '',
 })
 
 const noticeForm = reactive({
@@ -1257,13 +1287,69 @@ function saveResendToken() {
 function backupSetting() {
   const settingForm = {...setting.value}
   delete settingForm.resendTokens
+  delete settingForm.sesTokens
   delete settingForm.siteKey
   delete settingForm.secretKey
+  delete settingForm.sesAccessKey
+  delete settingForm.sesSecretKey
   backup = JSON.stringify(setting.value)
 }
 
 function cleanResendTokenForm() {
   resendTokenForm.token = ''
+}
+
+function cleanSesForm() {
+  // 清空表单值
+  sesForm.sesAccessKey = ''
+  sesForm.sesSecretKey = ''
+  sesForm.sesRegion = ''
+}
+
+function openSesForm() {
+  // 初始化表单值
+  sesForm.sesAccessKey = setting.value.sesAccessKey || ''
+  sesForm.sesSecretKey = setting.value.sesSecretKey || ''
+  sesForm.sesRegion = setting.value.sesRegion || ''
+  sesFormShow.value = true
+}
+
+function saveSesConfig() {
+  // 表单验证
+  if (!sesForm.sesAccessKey) {
+    ElMessage({
+      message: t('emptySesAccessKey'),
+      type: 'error',
+      plain: true
+    })
+    return
+  }
+
+  if (!sesForm.sesSecretKey) {
+    ElMessage({
+      message: t('emptySesSecretKey'),
+      type: 'error',
+      plain: true
+    })
+    return
+  }
+
+  if (!sesForm.sesRegion) {
+    ElMessage({
+      message: t('emptySesRegion'),
+      type: 'error',
+      plain: true
+    })
+    return
+  }
+
+  const settingForm = {
+    sesAccessKey: sesForm.sesAccessKey,
+    sesSecretKey: sesForm.sesSecretKey,
+    sesRegion: sesForm.sesRegion
+  }
+
+  editSetting(settingForm)
 }
 
 function beforeChange() {
@@ -1279,6 +1365,9 @@ function change(e) {
   delete settingForm.s3AccessKey
   delete settingForm.s3SecretKey
   delete settingForm.resendTokens
+  delete settingForm.sesTokens
+  delete settingForm.sesAccessKey
+  delete settingForm.sesSecretKey
   editSetting(settingForm, false)
 }
 
