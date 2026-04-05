@@ -120,10 +120,15 @@ const sesService = {
         const bodyString = JSON.stringify(requestBody);
 
         // AWS Signature V4 签名
+        function getAmzDate(date = new Date()) {
+            return date.toISOString().replace(/[:-]|\.\d{3}/g, '')
+        }
         const now = new Date();
-        const datetime = now.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
-        const amzDate = datetime.slice(0, 17) + 'Z';
+        const amzDate = getAmzDate(now);
         const date = amzDate.slice(0, 8);
+
+        // 调试日志
+        console.log("amzDate:", amzDate);
 
         const queryParams = {};
         const headers = {
