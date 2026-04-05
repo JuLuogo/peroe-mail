@@ -70,7 +70,7 @@
       </div>
     </div>
     <el-dialog top="10vh" v-model="showContacts" @closed="clearSelectContact" :title="t('recentContacts')">
-      <el-table ref="contactsTabRef" row-key="email" :data="contacts" style="height: 445px">
+      <el-table ref="contactsTabRef" row-key="email" :data="allRecipients" style="height: 445px">
         <el-table-column type="selection" width="32" />
         <el-table-column property="email" :label="t('emailAccount')" >
           <template #default="props">
@@ -98,6 +98,7 @@ import {h, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, computed} fro
 import {Icon} from "@iconify/vue";
 import {useUserStore} from "@/store/user.js";
 import {emailSend} from "@/request/email.js";
+import {contactList} from "@/request/contact.js";
 import {isEmail} from "@/utils/verify-utils.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
@@ -139,6 +140,7 @@ const contactsTabRef = ref({})
 const showContacts = ref(false)
 const mySelect = ref()
 let selectStatus = false
+const contactList = ref([])
 const backReply = reactive({
   receiveEmail: [],
   subject: '',
@@ -161,14 +163,32 @@ const form = reactive({
 
 const selectRecipientList = ref([])
 
-const contacts = computed(() => writerStore.sendRecipientRecord.map(item => ({email: item})))
+// 历史发送记录
+const historyRecords = computed(() => writerStore.sendRecipientRecord.map(item => ({email: item, isHistory: true})))
 
-function openContacts() {
+// 合并历史记录和联系人
+const allRecipients = computed(() => {
+  const historyEmails = historyRecords.value.map(h => h.email)
+  const uniqueContacts = contactList.value.filter(c => !historyEmails.includes(c.email))
+  return [...historyRecords.value, ...uniqueContacts.map(item => ({email: item.email, name: item.name, isHistory: false}))]
+})
+
+async function openContacts() {
   showContacts.value = true
+  // 加载联系人列表
+  try {
+    const data = await contactList({ num: 1, size: 100 })
+    contactList.value = data.list || []
+  } catch (e) {
+    console.error('Failed to load contacts:', e)
+    contactList.value = []
+  }
   nextTick(() => {
+    // 选中已选择的收件人
     form.receiveEmail.forEach(item => {
-      if (writerStore.sendRecipientRecord.includes(item)) {
-        contactsTabRef.value.toggleRowSelection({email: item});
+      const row = allRecipients.value.find(r => r.email === item)
+      if (row) {
+        contactsTabRef.value.toggleRowSelection(row);
       }
     })
   })
@@ -180,23 +200,24 @@ function deleteContact() {
     cancelButtonText: t('cancel'),
     type: 'warning'
   }).then(() => {
-    const contactList = contactsTabRef.value.getSelectionRows().map(item => item.email);
-    form.receiveEmail = form.receiveEmail.filter(item => !contactList.includes(item));
-    writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(item => !contactList.includes(item));
+    const selectedEmails = contactsTabRef.value.getSelectionRows().map(item => item.email);
+    form.receiveEmail = form.receiveEmail.filter(item => !selectedEmails.includes(item));
+    // 只从历史记录中删除，不删除联系人
+    writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(item => !selectedEmails.includes(item));
   })
 }
 
 function chooseContact() {
-
-  const contactList = contactsTabRef.value.getSelectionRows().map(item => item.email);
-  contactList.forEach(item => {
-    if (!form.receiveEmail.includes(item)) {
-      form.receiveEmail.push(item);
+  const selectedRows = contactsTabRef.value.getSelectionRows()
+  selectedRows.forEach(item => {
+    if (!form.receiveEmail.includes(item.email)) {
+      form.receiveEmail.push(item.email);
     }
   })
 
+  // 如果是从历史记录中选择的，则移动到最前面
   form.receiveEmail = form.receiveEmail.filter(item => {
-    return contactList.includes(item) || !writerStore.sendRecipientRecord.includes(item);
+    return selectedRows.some(s => s.email === item) || !writerStore.sendRecipientRecord.includes(item);
   });
 
   showContacts.value = false
