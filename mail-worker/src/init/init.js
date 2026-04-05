@@ -30,6 +30,7 @@ const dbInit = {
 		await this.v2_9DB(c);
 		await this.v2_10DB(c);
 		await this.v2_11DB(c);
+		await this.v2_12DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -63,6 +64,121 @@ const dbInit = {
 			await c.env.db.prepare(`ALTER TABLE user ADD COLUMN forward_email TEXT NOT NULL DEFAULT '';`).run();
 		} catch (e) {
 			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v2_12DB(c) {
+		// 添加邮件归档字段
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN is_archive INTEGER NOT NULL DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN archive_time TEXT;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+
+		// 添加用户 TOTP 字段
+		try {
+			await c.env.db.prepare(`ALTER TABLE user ADD COLUMN totp_secret TEXT;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+		try {
+			await c.env.db.prepare(`ALTER TABLE user ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+		try {
+			await c.env.db.prepare(`ALTER TABLE user ADD COLUMN totp_bind_time TEXT;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+
+		// 创建联系人分组表
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS contact_group (
+					group_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					name TEXT NOT NULL,
+					color TEXT DEFAULT '#1890ff',
+					sort INTEGER DEFAULT 0 NOT NULL,
+					create_time TEXT DEFAULT (datetime('now')) NOT NULL,
+					is_del INTEGER DEFAULT 0 NOT NULL
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过表创建：${e.message}`);
+		}
+
+		// 创建联系人表
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS contact (
+					contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					email TEXT NOT NULL,
+					name TEXT NOT NULL,
+					company TEXT,
+					phone TEXT,
+					description TEXT,
+					group_id INTEGER,
+					is_star INTEGER DEFAULT 0 NOT NULL,
+					send_count INTEGER DEFAULT 0 NOT NULL,
+					last_send_time TEXT,
+					create_time TEXT DEFAULT (datetime('now')) NOT NULL,
+					update_time TEXT,
+					is_del INTEGER DEFAULT 0 NOT NULL
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过表创建：${e.message}`);
+		}
+
+		// 创建过滤规则表
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS filter_rule (
+					rule_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					name TEXT NOT NULL,
+					field TEXT NOT NULL,
+					operator TEXT NOT NULL,
+					value TEXT NOT NULL,
+					action INTEGER NOT NULL,
+					action_target TEXT,
+					priority INTEGER DEFAULT 0 NOT NULL,
+					status INTEGER DEFAULT 1 NOT NULL,
+					create_time TEXT DEFAULT (datetime('now')) NOT NULL,
+					is_del INTEGER DEFAULT 0 NOT NULL
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过表创建：${e.message}`);
+		}
+
+		// 创建审计日志表
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS audit_log (
+					log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					user_email TEXT,
+					action TEXT NOT NULL,
+					target_type TEXT NOT NULL,
+					target_id TEXT,
+					target_desc TEXT,
+					detail TEXT,
+					ip TEXT,
+					user_agent TEXT,
+					create_time TEXT DEFAULT (datetime('now')) NOT NULL
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过表创建：${e.message}`);
 		}
 	},
 
