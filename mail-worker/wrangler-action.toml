@@ -47,7 +47,6 @@ linuxdo_switch = "${LINUXDO_SWITCH}"
 ses_access_key = "${SES_ACCESS_KEY}"
 ses_secret_key = "${SES_SECRET_KEY}"
 ses_region = "${SES_REGION}"
-ses_enabled = "${SES_ENABLED}"
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"
