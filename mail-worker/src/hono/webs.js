@@ -24,4 +24,5 @@ import '../api/contact-api'
 import '../api/audit-api'
 import '../api/filter-api'
 import '../api/2fa-api'
+import '../api/forward-rule-api'
 export default app;

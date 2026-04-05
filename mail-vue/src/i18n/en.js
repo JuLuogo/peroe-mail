@@ -419,7 +419,18 @@ const en = {
     searchUser: 'Search by user',
     searchEmail: 'Search by Email',
     searchSender: 'Search by Sender',
-    userEmail: 'Email Address'
+    userEmail: 'Email Address',
+    forwardRules: 'Forwarding Rules',
+    pattern: 'Pattern',
+    forwardTo: 'Forward To',
+    patternPlaceholder: 'e.g., *-99@99.com',
+    forwardToPlaceholder: 'e.g., a@juluo.work',
+    patternTip: '* matches any characters, e.g., *-99@99.com matches abc-99@99.com',
+    patternMustContainWildcard: 'Pattern must contain wildcard * and @',
+    forwardToEmailInvalid: 'Invalid forward email format',
+    noForwardRules: 'No forwarding rules',
+    enterDescription: 'Enter description (optional)',
+    pleaseFillRequiredFields: 'Please fill in required fields'
 }
 
 export default en

@@ -31,6 +31,7 @@ const dbInit = {
 		await this.v2_10DB(c);
 		await this.v2_11DB(c);
 		await this.v2_12DB(c);
+		await this.v2_13DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -64,6 +65,51 @@ const dbInit = {
 			await c.env.db.prepare(`ALTER TABLE user ADD COLUMN forward_email TEXT NOT NULL DEFAULT '';`).run();
 		} catch (e) {
 			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v2_13DB(c) {
+		try {
+			await c.env.db.prepare(`
+				CREATE TABLE IF NOT EXISTS forward_rule (
+					rule_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL DEFAULT 0,
+					pattern TEXT NOT NULL,
+					forward_to TEXT NOT NULL,
+					description TEXT DEFAULT '',
+					priority INTEGER DEFAULT 0 NOT NULL,
+					status INTEGER DEFAULT 1 NOT NULL,
+					create_time TEXT DEFAULT (datetime('now')) NOT NULL,
+					is_del INTEGER DEFAULT 0 NOT NULL
+				)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过表创建：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_forward_rule_user ON forward_rule(user_id);`).run();
+		} catch (e) {
+			console.warn(`跳过索引创建：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_forward_rule_status ON forward_rule(status);`).run();
+		} catch (e) {
+			console.warn(`跳过索引创建：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
+				(49, '转发规则', NULL, 0, 1, 6.4),
+				(50, '规则查看', 'forward-rule:query', 49, 2, 0),
+				(51, '规则添加', 'forward-rule:add', 49, 2, 1),
+				(52, '规则修改', 'forward-rule:update', 49, 2, 2),
+				(53, '规则删除', 'forward-rule:delete', 49, 2, 3)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过权限数据：${e.message}`);
 		}
 	},
 

@@ -10,6 +10,7 @@ import emailUtils from '../utils/email-utils';
 import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
+import forwardRuleService from '../service/forward-rule-service';
 
 export async function email(message, env, ctx) {
 
@@ -49,6 +50,12 @@ export async function email(message, env, ctx) {
 		if (!account && noRecipient === settingConst.noRecipient.CLOSE) {
 			message.setReject('Recipient not found');
 			return;
+		}
+
+		// Catch-all 规则匹配
+		let forwardRule = null;
+		if (!account) {
+			forwardRule = await forwardRuleService.findMatchingRule({ env: env }, message.to);
 		}
 
 		let userRow = {}
@@ -156,6 +163,16 @@ export async function email(message, env, ctx) {
 		// } else {
 		// 	// 用户继承全局设置 或 无 account/userRow
 		// }
+
+		// Catch-all 规则转发
+		if (forwardRule) {
+			try {
+				console.log(`Catch-all 匹配: ${message.to} -> ${forwardRule.forwardTo}`);
+				await message.forward(forwardRule.forwardTo.trim());
+			} catch (e) {
+				console.error(`Catch-all 转发失败: ${e}`);
+			}
+		}
 
 		//转发到其他邮箱（仅使用全局设置）
 		if (forwardStatus === settingConst.forwardStatus.OPEN && forwardEmail) {
