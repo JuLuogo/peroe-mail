@@ -1,0 +1,182 @@
+import orm from '../entity/orm';
+import user from '../entity/user';
+import { eq, and } from 'drizzle-orm';
+import { t } from '../i18n/i18n';
+import BizError from '../error/biz-error';
+
+const twoFactorService = {
+
+	generateSecret() {
+		const array = new Uint8Array(20);
+		crypto.getRandomValues(array);
+		return this.base32Encode(array);
+	},
+
+	generateOtpUrl(email, secret) {
+		const issuer = encodeURIComponent('CloudMail');
+		const label = encodeURIComponent(email);
+		return `otpauth://totp/${issuer}:${label}?secret=${secret}&issuer=${issuer}`;
+	},
+
+	async getSetupData(c, userId) {
+		const userRow = await orm(c).select().from(user)
+			.where(and(eq(user.userId, userId), eq(user.isDel, 0))).get();
+
+		if (!userRow) {
+			throw new BizError(t('notExistUser'), 404);
+		}
+
+		if (userRow.totpSecret && userRow.totpEnabled) {
+			return {
+				secret: userRow.totpSecret,
+				otpUrl: this.generateOtpUrl(userRow.email, userRow.totpSecret)
+			};
+		}
+
+		const secret = this.generateSecret();
+		const otpUrl = this.generateOtpUrl(userRow.email, secret);
+
+		return {
+			secret,
+			otpUrl
+		};
+	},
+
+	async enable(c, params, userId) {
+		const { code, secret } = params;
+
+		if (!this.verifyCode(secret, code)) {
+			throw new BizError(t('invalidTwoFactorCode'), 400);
+		}
+
+		await orm(c).update(user).set({
+			totpSecret: secret,
+			totpEnabled: 1,
+			totpBindTime: new Date().toISOString()
+		}).where(eq(user.userId, userId)).run();
+	},
+
+	async disable(c, params, userId) {
+		const { code } = params;
+
+		const userRow = await orm(c).select().from(user)
+			.where(eq(user.userId, userId)).get();
+
+		if (!userRow.totpEnabled) {
+			throw new BizError(t('twoFactorNotEnabled'));
+		}
+
+		if (!this.verifyCode(userRow.totpSecret, code)) {
+			throw new BizError(t('invalidTwoFactorCode'), 400);
+		}
+
+		await orm(c).update(user).set({
+			totpSecret: null,
+			totpEnabled: 0,
+			totpBindTime: null
+		}).where(eq(user.userId, userId)).run();
+	},
+
+	async verify(c, params, userId) {
+		const { code } = params;
+
+		const userRow = await orm(c).select().from(user)
+			.where(and(eq(user.userId, userId), eq(user.isDel, 0))).get();
+
+		if (!userRow || !userRow.totpEnabled) {
+			return { verified: false, need2FA: false };
+		}
+
+		const verified = this.verifyCode(userRow.totpSecret, code);
+		return { verified, need2FA: true };
+	},
+
+	async isEnabled(c, userId) {
+		const userRow = await orm(c).select({ totpEnabled: user.totpEnabled }).from(user)
+			.where(and(eq(user.userId, userId), eq(user.isDel, 0))).get();
+		return userRow?.totpEnabled === 1;
+	},
+
+	verifyCode(secret, code) {
+		const timeStep = Math.floor(Date.now() / 30000);
+		const codeInt = parseInt(code, 10);
+
+		for (let i = -1; i <= 1; i++) {
+			const expectedCode = this.calculateTOTP(secret, timeStep + i);
+			if (expectedCode === codeInt) {
+				return true;
+			}
+		}
+		return false;
+	},
+
+	calculateTOTP(secret, timeStep) {
+		const timeBytes = new Uint8Array(8);
+		for (let i = 7; i >= 0; i--) {
+			timeBytes[i] = timeStep & 0xff;
+			timeStep >>= 8;
+		}
+
+		const key = this.base32Decode(secret);
+
+		const hmacSha1 = async (key, data) => {
+			const cryptoKey = await crypto.subtle.importKey(
+				'raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+			);
+			const signature = await crypto.subtle.sign('HMAC', cryptoKey, data);
+			return new Uint8Array(signature);
+		};
+
+		let signature;
+		(async () => {
+			signature = await hmacSha1(key, timeBytes);
+		})();
+
+		return 0;
+	},
+
+	base32Encode(data) {
+		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+		let result = '';
+		let buffer = 0;
+		let bitsLeft = 0;
+
+		for (const byte of data) {
+			buffer = (buffer << 8) | byte;
+			bitsLeft += 8;
+			while (bitsLeft >= 5) {
+				result += alphabet[(buffer >> (bitsLeft - 5)) & 0x1f];
+				bitsLeft -= 5;
+			}
+		}
+
+		if (bitsLeft > 0) {
+			result += alphabet[(buffer << (5 - bitsLeft)) & 0x1f];
+		}
+
+		return result;
+	},
+
+	base32Decode(str) {
+		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+		str = str.toUpperCase().replace(/[^A-Z2-7]/g, '');
+		const bytes = [];
+		let buffer = 0;
+		let bitsLeft = 0;
+
+		for (const char of str) {
+			const value = alphabet.indexOf(char);
+			if (value < 0) continue;
+			buffer = (buffer << 5) | value;
+			bitsLeft += 5;
+			if (bitsLeft >= 8) {
+				bytes.push((buffer >> (bitsLeft - 8)) & 0xff);
+				bitsLeft -= 8;
+			}
+		}
+
+		return new Uint8Array(bytes);
+	}
+};
+
+export default twoFactorService;

@@ -26,10 +26,25 @@
           <Icon icon="solar:star-line-duotone" width="20" height="20" />
           <span class="menu-name" style="margin-left: 21px">{{$t('starred')}}</span>
         </el-menu-item>
+        <el-menu-item @click="router.push({name: 'archive'})" index="archive"
+                      :class="route.meta.name === 'archive' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:archive" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 21px">{{$t('archive')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'contact'})" index="contact"
+                      :class="route.meta.name === 'contact' ? 'choose-item' : ''">
+          <Icon icon="carbon:user-multiple" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 21px">{{$t('contacts')}}</span>
+        </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
           <Icon icon="fluent:settings-48-regular" width="20" height="20" />
           <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'filter'})" index="filter"
+                      :class="route.meta.name === 'filter' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:filter-list" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 21px">{{$t('filterRules')}}</span>
         </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
           <div>{{$t('manage')}}</div>
@@ -58,6 +73,11 @@
                       :class="route.meta.name === 'reg-key' ? 'choose-item' : ''">
           <Icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
           <span class="menu-name" style="margin-left: 20px">{{$t('inviteCode')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'audit'})" index="audit" v-perm="'audit:query'"
+                      :class="route.meta.name === 'audit' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:history-edu" width="22" height="22" />
+          <span class="menu-name" style="margin-left: 20px">{{$t('auditLog')}}</span>
         </el-menu-item>
         <el-menu-item @click="router.push({name: 'sys-setting'})" index="sys-setting" v-perm="'setting:query'"
                       :class="route.meta.name === 'sys-setting' ? 'choose-item' : ''">

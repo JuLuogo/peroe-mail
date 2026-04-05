@@ -65,6 +65,11 @@ const en = {
 	notAdmin: 'The entered email is not an administrator email',
 	emailExistDatabase: 'Email already exists in the database',
 	notConfigOss: 'Object storage not configured',
+	contactAlreadyExist: 'Contact already exists',
+	filterRuleInvalid: 'Filter rule information is incomplete',
+	filterRuleNotExist: 'Filter rule does not exist',
+	invalidTwoFactorCode: 'Invalid two-factor verification code',
+	twoFactorNotEnabled: 'Two-factor authentication is not enabled',
 	perms: {
 		"邮件": "Emails",
 		"邮件发送": "Send Email",

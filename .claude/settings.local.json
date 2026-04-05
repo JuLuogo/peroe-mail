@@ -3,7 +3,12 @@
     "allow": [
       "Bash(pnpm install:*)",
       "Bash(npm run:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "mcp__serena__list_dir",
+      "Bash(npm --version)",
+      "Bash(npx pnpm:*)",
+      "Bash(npx wrangler:*)",
+      "Bash(timeout 8 pnpm dev)"
     ]
   }
 }

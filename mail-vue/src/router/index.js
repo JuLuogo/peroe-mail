@@ -51,6 +51,47 @@ const routes = [
                     menu: true
                 }
             },
+            {
+                path: '/archive',
+                name: 'archive',
+                component: () => import('@/views/archive/index.vue'),
+                meta: {
+                    title: 'archive',
+                    name: 'archive',
+                    menu: true
+                }
+            },
+            {
+                path: '/contact',
+                name: 'contact',
+                component: () => import('@/views/contact/index.vue'),
+                meta: {
+                    title: 'contacts',
+                    name: 'contact',
+                    menu: true
+                }
+            },
+            {
+                path: '/audit',
+                name: 'audit',
+                component: () => import('@/views/audit/index.vue'),
+                meta: {
+                    title: 'auditLog',
+                    name: 'audit',
+                    menu: true,
+                    adminOnly: true
+                }
+            },
+            {
+                path: '/filter',
+                name: 'filter',
+                component: () => import('@/views/filter/index.vue'),
+                meta: {
+                    title: 'filterRules',
+                    name: 'filter',
+                    menu: true
+                }
+            },
         ]
 
     },

@@ -65,6 +65,11 @@ const zh = {
 	notAdmin: '输入的邮箱不是管理员邮箱',
 	emailExistDatabase: '有邮箱已存在数据库中',
 	notConfigOss: '对象存储未配置',
+	contactAlreadyExist: '联系人已存在',
+	filterRuleInvalid: '过滤规则信息不完整',
+	filterRuleNotExist: '过滤规则不存在',
+	invalidTwoFactorCode: '无效的两步验证码',
+	twoFactorNotEnabled: '两步验证未启用',
 	perms: {
 		"邮件": "邮件",
 		"邮件发送": "邮件发送",

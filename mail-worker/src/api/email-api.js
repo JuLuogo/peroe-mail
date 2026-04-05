@@ -32,5 +32,25 @@ app.post('/email/send', async (c) => {
 app.put('/email/read', async (c) => {
 	await emailService.read(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
-})
+});
+
+app.put('/email/archive', async (c) => {
+	await emailService.archive(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.put('/email/unarchive', async (c) => {
+	await emailService.unarchive(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
+app.get('/email/archiveList', async (c) => {
+	const data = await emailService.archiveList(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+app.get('/email/search', async (c) => {
+	const data = await emailService.search(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
 

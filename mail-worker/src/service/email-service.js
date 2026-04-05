@@ -854,6 +854,148 @@ const emailService = {
 	async read(c, params, userId) {
 		const { emailIds } = params;
 		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+	},
+
+	async archive(c, params, userId) {
+		const { emailId } = params;
+		await orm(c).update(email).set({
+			isArchive: 1,
+			archiveTime: new Date().toISOString()
+		}).where(and(eq(email.emailId, emailId), eq(email.userId, userId))).run();
+	},
+
+	async unarchive(c, params, userId) {
+		const { emailId } = params;
+		await orm(c).update(email).set({
+			isArchive: 0,
+			archiveTime: null
+		}).where(and(eq(email.emailId, emailId), eq(email.userId, userId))).run();
+	},
+
+	async archiveList(c, params, userId) {
+		let { emailId, size, timeSort } = params;
+		size = Number(size) || 20;
+		emailId = Number(emailId) || 0;
+		timeSort = Number(timeSort) || 0;
+
+		if (size > 50) {
+			size = 50;
+		}
+
+		const conditions = [
+			eq(email.userId, userId),
+			eq(email.isArchive, 1),
+			eq(email.isDel, isDel.NORMAL)
+		];
+
+		if (timeSort) {
+			conditions.push(gt(email.emailId, emailId));
+		} else {
+			conditions.push(lt(email.emailId, emailId));
+		}
+
+		const list = await orm(c)
+			.select({
+				...email,
+				starId: star.starId
+			})
+			.from(email)
+			.leftJoin(
+				star,
+				and(
+					eq(star.emailId, email.emailId),
+					eq(star.userId, userId)
+				)
+			)
+			.where(and(...conditions))
+			.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
+			.limit(size).all();
+
+		const totalQuery = orm(c).select({ total: count() }).from(email)
+			.where(and(
+				eq(email.userId, userId),
+				eq(email.isArchive, 1),
+				eq(email.isDel, isDel.NORMAL)
+			)).get();
+
+		list.forEach(item => {
+			item.isStar = item.starId != null ? 1 : 0;
+		});
+
+		await this.emailAddAtt(c, list);
+
+		const [total] = await Promise.all([totalQuery]);
+
+		return { list, total: total.total };
+	},
+
+	async search(c, params, userId) {
+		let { keyword, emailId, size, timeSort, accountId, allReceive, type } = params;
+		size = Number(size) || 20;
+		emailId = Number(emailId) || 0;
+		timeSort = Number(timeSort) || 0;
+
+		if (size > 50) {
+			size = 50;
+		}
+
+		if (!emailId) {
+			emailId = timeSort ? 0 : 9999999999;
+		}
+
+		const conditions = [
+			eq(email.userId, userId),
+			eq(email.isDel, isDel.NORMAL),
+			sql`(${email.subject} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.content} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.sendEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.toEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.name} COLLATE NOCASE LIKE ${'%' + keyword + '%'})`
+		];
+
+		if (type !== undefined && type !== null && type !== '') {
+			conditions.push(eq(email.type, Number(type)));
+		}
+
+		if (accountId && !allReceive) {
+			conditions.push(eq(email.accountId, Number(accountId)));
+		}
+
+		if (timeSort) {
+			conditions.push(gt(email.emailId, emailId));
+		} else {
+			conditions.push(lt(email.emailId, emailId));
+		}
+
+		const list = await orm(c)
+			.select({
+				...email,
+				starId: star.starId
+			})
+			.from(email)
+			.leftJoin(
+				star,
+				and(
+					eq(star.emailId, email.emailId),
+					eq(star.userId, userId)
+				)
+			)
+			.where(and(...conditions))
+			.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
+			.limit(size).all();
+
+		const totalQuery = orm(c).select({ total: count() }).from(email)
+			.where(and(
+				eq(email.userId, userId),
+				eq(email.isDel, isDel.NORMAL),
+				sql`(${email.subject} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.content} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.sendEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.toEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.name} COLLATE NOCASE LIKE ${'%' + keyword + '%'})`
+			)).get();
+
+		list.forEach(item => {
+			item.isStar = item.starId != null ? 1 : 0;
+		});
+
+		await this.emailAddAtt(c, list);
+
+		const [total] = await Promise.all([totalQuery]);
+
+		return { list, total: total.total };
 	}
 };
 
