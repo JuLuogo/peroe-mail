@@ -22,6 +22,8 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import sesService from './ses-service.js';
+import auditService from './audit-service';
+import { auditConst } from '../entity/audit-log';
 
 const emailService = {
 
@@ -134,14 +136,30 @@ const emailService = {
 		return { list, total: totalRow.total, latestEmail };
 	},
 
-	async delete(c, params, userId) {
+	async delete(c, params, userId, operatorInfo) {
 		const { emailIds } = params;
 		const emailIdList = emailIds.split(',').map(Number);
+
+		// 获取要删除的邮件信息用于审计日志
+		const emailList = await orm(c).select().from(email)
+			.where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList))).all();
+
 		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
 			and(
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))
 			.run();
+
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: emailList.length > 1 ? auditConst.action.EMAIL_BATCH_DELETE : auditConst.action.EMAIL_DELETE,
+			targetType: auditConst.targetType.EMAIL,
+			targetId: emailIds,
+			targetDesc: emailList.length > 1 ? `${emailList.length} emails` : emailList[0]?.subject,
+			detail: { emailIds, subjects: emailList.map(e => e.subject), count: emailList.length }
+		});
 	},
 
 	receive(c, params, cidAttList, r2domain) {

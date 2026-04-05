@@ -4,8 +4,13 @@ import userContext from '../security/user-context';
 import result from '../model/result';
 import permService from '../service/perm-service';
 
+const getOperatorInfo = (c) => ({
+	userId: userContext.getUserId(c),
+	userEmail: userContext.getUser(c)?.email
+});
+
 app.post('/role/add', async (c) => {
-	await roleService.add(c, await c.req.json(), userContext.getUserId(c));
+	await roleService.add(c, await c.req.json(), userContext.getUserId(c), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 
@@ -15,7 +20,7 @@ app.put('/role/setDefault', async (c) => {
 });
 
 app.put('/role/set', async (c) => {
-	await roleService.setRole(c, await c.req.json());
+	await roleService.setRole(c, await c.req.json(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 
@@ -25,7 +30,7 @@ app.get('/role/permTree', async (c) => {
 });
 
 app.delete('/role/delete', async (c) => {
-	await roleService.delete(c, c.req.query());
+	await roleService.delete(c, c.req.query(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 

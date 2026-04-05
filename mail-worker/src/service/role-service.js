@@ -10,10 +10,12 @@ import user from '../entity/user';
 import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n.js';
 import emailUtils from '../utils/email-utils';
+import auditService from './audit-service';
+import { auditConst } from '../entity/audit-log';
 
 const roleService = {
 
-	async add(c, params, userId) {
+	async add(c, params, userId, operatorInfo) {
 
 		let { name, permIds, banEmail, availDomain } = params;
 
@@ -43,6 +45,16 @@ const roleService = {
 
 		await orm(c).insert(rolePerm).values(rolePermList).run();
 
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.ROLE_CREATE,
+			targetType: auditConst.targetType.ROLE,
+			targetId: String(roleRow.roleId),
+			targetDesc: name,
+			detail: { name, permIds }
+		});
 
 	},
 
@@ -62,7 +74,7 @@ const roleService = {
 		return roleList;
 	},
 
-	async setRole(c, params) {
+	async setRole(c, params, operatorInfo) {
 
 		let { name, permIds, roleId, banEmail, availDomain } = params;
 
@@ -90,9 +102,20 @@ const roleService = {
 			await orm(c).insert(rolePerm).values(rolePermList).run();
 		}
 
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.ROLE_UPDATE,
+			targetType: auditConst.targetType.ROLE,
+			targetId: String(roleId),
+			targetDesc: name,
+			detail: { name, permIds }
+		});
+
 	},
 
-	async delete(c, params) {
+	async delete(c, params, operatorInfo) {
 
 		const { roleId } = params;
 
@@ -112,6 +135,17 @@ const roleService = {
 
 		await orm(c).delete(rolePerm).where(eq(rolePerm.roleId, roleId)).run();
 		await orm(c).delete(role).where(eq(role.roleId, roleId)).run();
+
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.ROLE_DELETE,
+			targetType: auditConst.targetType.ROLE,
+			targetId: String(roleId),
+			targetDesc: roleRow.name,
+			detail: { name: roleRow.name }
+		});
 
 	},
 

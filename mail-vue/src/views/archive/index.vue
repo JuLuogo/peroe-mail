@@ -35,8 +35,8 @@ function jumpContent(email) {
   router.push('/message')
 }
 
-function getArchiveList(params) {
-  return archiveList(params)
+function getArchiveList(emailId, size) {
+  return archiveList({ emailId, size })
 }
 
 function unarchiveEmail(emailId) {

@@ -184,7 +184,7 @@
               </div>
             </template>
           </el-dropdown-item>
-          <el-dropdown-item v-if="['email','star'].includes(props.type)" @click="archiveChange(rightClickEmail)">
+          <el-dropdown-item v-if="['email','star', 'archive'].includes(props.type)" @click="archiveChange(rightClickEmail)">
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="material-symbols:archive-outline" width="20" height="20"/>

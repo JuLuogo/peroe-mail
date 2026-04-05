@@ -6,10 +6,12 @@ import BizError from '../error/biz-error';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
 import userService from './user-service';
 import { t } from '../i18n/i18n.js';
+import auditService from './audit-service';
+import { auditConst } from '../entity/audit-log';
 
 const regKeyService = {
 
-	async add(c, params, userId) {
+	async add(c, params, userId, operatorInfo) {
 
 		let {code,roleId,count,expireTime} = params;
 
@@ -39,12 +41,37 @@ const regKeyService = {
 		expireTime = formatDetailDate(expireTime)
 
 		await orm(c).insert(regKey).values({code,roleId,count,userId,expireTime}).run();
+
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.REG_KEY_CREATE,
+			targetType: auditConst.targetType.REG_KEY,
+			targetId: code,
+			targetDesc: code,
+			detail: { code, roleId, count, expireTime }
+		});
 	},
 
-	async delete(c, params) {
+	async delete(c, params, operatorInfo) {
 		let {regKeyIds} = params;
 		regKeyIds = regKeyIds.split(',').map(id => Number(id));
+		const regKeys = await orm(c).select().from(regKey).where(inArray(regKey.regKeyId, regKeyIds)).all();
 		await orm(c).delete(regKey).where(inArray(regKey.regKeyId,regKeyIds)).run();
+
+		// 审计日志
+		for (const regKeyRow of regKeys) {
+			await auditService.log(c, {
+				userId: operatorInfo.userId,
+				userEmail: operatorInfo.userEmail,
+				action: auditConst.action.REG_KEY_DELETE,
+				targetType: auditConst.targetType.REG_KEY,
+				targetId: String(regKeyRow.regKeyId),
+				targetDesc: regKeyRow.code,
+				detail: { code: regKeyRow.code }
+			});
+		}
 	},
 
 	async clearNotUse(c) {

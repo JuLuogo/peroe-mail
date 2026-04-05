@@ -8,6 +8,8 @@ import constant from '../const/constant';
 import BizError from '../error/biz-error';
 import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
+import auditService from './audit-service';
+import { auditConst } from '../entity/audit-log';
 
 const settingService = {
 
@@ -150,7 +152,7 @@ const settingService = {
 		return settingRow;
 	},
 
-	async set(c, params) {
+	async set(c, params, operatorInfo) {
 		const settingData = await this.query(c);
 		let resendTokens = { ...settingData.resendTokens, ...params.resendTokens };
 		Object.keys(resendTokens).forEach(domain => {
@@ -176,6 +178,16 @@ const settingService = {
 		params.sendMethodConfig = JSON.stringify(sendMethodConfig);
 		await orm(c).update(setting).set({ ...params }).returning().get();
 		await this.refresh(c);
+
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.SETTING_UPDATE,
+			targetType: auditConst.targetType.SETTING,
+			targetDesc: 'System Settings',
+			detail: { changedKeys: Object.keys(params) }
+		});
 	},
 
 	async deleteBackground(c) {

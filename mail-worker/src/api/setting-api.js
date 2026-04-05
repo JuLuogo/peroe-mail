@@ -1,9 +1,15 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import settingService from '../service/setting-service';
+import userContext from '../security/user-context';
+
+const getOperatorInfo = (c) => ({
+	userId: userContext.getUserId(c),
+	userEmail: userContext.getUser(c)?.email
+});
 
 app.put('/setting/set', async (c) => {
-	await settingService.set(c, await c.req.json());
+	await settingService.set(c, await c.req.json(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 

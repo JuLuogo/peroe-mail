@@ -18,6 +18,8 @@ import { t } from '../i18n/i18n'
 import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
+import auditService from "./audit-service";
+import { auditConst } from '../entity/audit-log';
 
 const userService = {
 
@@ -94,17 +96,42 @@ const userService = {
 			.get();
 	},
 
-	async delete(c, userId) {
+	async delete(c, params, operatorInfo) {
+		const { userId } = params;
+		const userRow = await this.selectById(c, userId);
 		await orm(c).update(user).set({ isDel: isDel.DELETE }).where(eq(user.userId, userId)).run();
-		await c.env.kv.delete(kvConst.AUTH_INFO + userId)
+		await c.env.kv.delete(kvConst.AUTH_INFO + userId);
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.USER_DELETE,
+			targetType: auditConst.targetType.USER,
+			targetId: String(userId),
+			targetDesc: userRow?.email,
+			detail: { email: userRow?.email }
+		});
 	},
 
-	async physicsDelete(c, params) {
+	async physicsDelete(c, params, operatorInfo) {
 		let { userIds } = params;
 		userIds = userIds.split(',').map(Number);
+		const users = await orm(c).select().from(user).where(inArray(user.userId, userIds)).all();
 		await accountService.physicsDeleteByUserIds(c, userIds);
 		await oauthService.deleteByUserIds(c, userIds);
 		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
+		// 审计日志
+		for (const userRow of users) {
+			await auditService.log(c, {
+				userId: operatorInfo.userId,
+				userEmail: operatorInfo.userEmail,
+				action: auditConst.action.USER_DELETE,
+				targetType: auditConst.targetType.USER,
+				targetId: String(userRow.userId),
+				targetDesc: userRow.email,
+				detail: { email: userRow.email, physicsDelete: true }
+			});
+		}
 	},
 
 	async list(c, params) {
@@ -246,16 +273,28 @@ const userService = {
 			.run();
 	},
 
-	async setPwd(c, params) {
+	async setPwd(c, params, operatorInfo) {
 
 		const { password, userId } = params;
+		const userRow = await this.selectById(c, userId);
 		await this.resetPassword(c, { password }, userId);
 		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.USER_PWD_RESET,
+			targetType: auditConst.targetType.USER,
+			targetId: String(userId),
+			targetDesc: userRow?.email,
+			detail: { email: userRow?.email }
+		});
 	},
 
-	async setStatus(c, params) {
+	async setStatus(c, params, operatorInfo) {
 
 		const { status, userId } = params;
+		const userRow = await this.selectById(c, userId);
 
 		await orm(c)
 			.update(user)
@@ -266,6 +305,17 @@ const userService = {
 		if (status === userConst.status.BAN) {
 			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 		}
+
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: status === userConst.status.BAN ? auditConst.action.USER_BAN : auditConst.action.USER_UNBAN,
+			targetType: auditConst.targetType.USER,
+			targetId: String(userId),
+			targetDesc: userRow?.email,
+			detail: { status, email: userRow?.email }
+		});
 	},
 
 	async setType(c, params) {
@@ -349,14 +399,14 @@ const userService = {
 		await orm(c).update(user).set({ sendCount: 0 }).where(eq(user.userId, params.userId)).run();
 	},
 
-	async restore(c, params) {
-		const { userId, type } = params
+	async restore(c, params, operatorInfo) {
+		const { userId, type } = params;
+		const userRow = await this.selectById(c, userId);
 		await orm(c)
 			.update(user)
 			.set({ isDel: isDel.NORMAL })
 			.where(eq(user.userId, userId))
 			.run();
-		const userRow = await this.selectById(c, userId);
 		await accountService.restoreByEmail(c, userRow.email);
 
 		if (type) {
@@ -364,6 +414,16 @@ const userService = {
 			await accountService.restoreByUserId(c, userId);
 		}
 
+		// 审计日志
+		await auditService.log(c, {
+			userId: operatorInfo.userId,
+			userEmail: operatorInfo.userEmail,
+			action: auditConst.action.USER_RESTORE,
+			targetType: auditConst.targetType.USER,
+			targetId: String(userId),
+			targetDesc: userRow?.email,
+			detail: { email: userRow?.email, restoreType: type }
+		});
 	},
 
 	listByRegKeyId(c, regKeyId) {

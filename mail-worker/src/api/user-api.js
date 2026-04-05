@@ -4,18 +4,23 @@ import result from '../model/result';
 import userContext from '../security/user-context';
 import accountService from '../service/account-service';
 
+const getOperatorInfo = (c) => ({
+	userId: userContext.getUserId(c),
+	userEmail: userContext.getUser(c)?.email
+});
+
 app.delete('/user/delete', async (c) => {
-	await userService.physicsDelete(c, c.req.query());
+	await userService.physicsDelete(c, c.req.query(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/setPwd', async (c) => {
-	await userService.setPwd(c, await c.req.json());
+	await userService.setPwd(c, await c.req.json(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/setStatus', async (c) => {
-	await userService.setStatus(c, await c.req.json());
+	await userService.setStatus(c, await c.req.json(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 
@@ -40,7 +45,7 @@ app.put('/user/resetSendCount', async (c) => {
 });
 
 app.put('/user/restore', async (c) => {
-	await userService.restore(c, await c.req.json());
+	await userService.restore(c, await c.req.json(), getOperatorInfo(c));
 	return c.json(result.ok());
 });
 

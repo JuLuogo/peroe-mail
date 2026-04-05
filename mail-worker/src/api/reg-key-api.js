@@ -3,8 +3,13 @@ import result from '../model/result';
 import regKeyService from '../service/reg-key-service';
 import userContext from '../security/user-context';
 
+const getOperatorInfo = (c) => ({
+	userId: userContext.getUserId(c),
+	userEmail: userContext.getUser(c)?.email
+});
+
 app.post('/regKey/add', async (c) => {
-	await regKeyService.add(c, await c.req.json(), await userContext.getUserId(c));
+	await regKeyService.add(c, await c.req.json(), await userContext.getUserId(c), getOperatorInfo(c));
 	return c.json(result.ok());
 })
 
@@ -14,7 +19,7 @@ app.get('/regKey/list', async (c) => {
 })
 
 app.delete('/regKey/delete', async (c) => {
-	await regKeyService.delete(c, c.req.query());
+	await regKeyService.delete(c, c.req.query(), getOperatorInfo(c));
 	return c.json(result.ok());
 })
 
