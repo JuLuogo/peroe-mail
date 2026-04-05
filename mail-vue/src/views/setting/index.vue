@@ -146,7 +146,7 @@ const userStore = useUserStore();
 // 转发规则相关
 const hasForwardDomain = ref(false) // 是否有可用域名权限
 const forwardEnabled = computed({
-  get: () => userStore.user.forwardStatus === 1,
+  get: () => userStore.user.forwardStatus === 0, // 0=OPEN, 1=CLOSE
   set: (val) => val
 }) // 是否启用转发
 const forwardRules = ref([])
@@ -457,13 +457,14 @@ async function toggleRule(rule) {
 
 async function toggleForward(val) {
   try {
-    await userSetForwardStatus({ forwardStatus: val ? 1 : 0 })
-    userStore.user.forwardStatus = val ? 1 : 0
+    await userSetForwardStatus({ forwardStatus: val ? 0 : 1 }) // val=true=OPEN=0, val=false=CLOSE=1
+    userStore.user.forwardStatus = val ? 0 : 1
     ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
     console.error('Failed to toggle forward:', e)
-    // Revert the switch state
-    userStore.user.forwardStatus = val ? 0 : 1
+    ElMessage.error(e?.message || t('saveFailedMsg') || '操作失败')
+    // 刷新用户信息以恢复正确状态
+    userStore.refreshUserInfo()
   }
 }
 

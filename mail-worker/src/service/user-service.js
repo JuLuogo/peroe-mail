@@ -460,8 +460,7 @@ const userService = {
 
 	async setForwardStatus(c, params, operatorInfo) {
 		const { forwardStatus } = params;
-		const currentUser = userContext.getUser(c);
-		const userId = currentUser.userId;
+		const userId = operatorInfo.userId;
 
 		await orm(c)
 			.update(user)
