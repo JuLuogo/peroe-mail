@@ -116,12 +116,8 @@ const en = {
 		"规则删除": "Delete Rules",
 		"审计日志": "Audit Logs",
 		"日志查看": "View Logs",
-			"转发规则": "Forwarding Rules",
-			"规则查看": "View Rules",
-			"规则添加": "Add Rules",
-			"规则修改": "Edit Rules",
-			"规则删除": "Delete Rules"
-		},
+		"转发规则": "Forwarding Rules"
+	},
 	forwardRuleParamInvalid: 'Rule parameters are incomplete',
 	forwardToEmailInvalid: 'Invalid forward email format',
 	forwardPatternMustContainWildcard: 'Pattern must contain wildcard * and @',

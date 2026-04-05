@@ -431,8 +431,8 @@ const zh = {
     noForwardRules: '暂无转发规则',
     enterDescription: '请输入描述（可选）',
     pleaseFillRequiredFields: '请填写必填字段',
-    availableDomains: '可用域名',
-    availableDomainsPlaceholder: '多个域名用,分开，留空则跟随角色设置',
-    availableDomainsTip: '设置用户可以使用 catch-all 转发规则的域名，留空则使用角色设置'
+    forwardAvailDomains: '可用域名',
+    forwardAvailDomainsPlaceholder: '多个域名用,分开，留空则跟随角色设置',
+    forwardAvailDomainsTip: '设置用户可以使用 catch-all 转发规则的域名，留空则使用角色设置'
 }
 export default zh

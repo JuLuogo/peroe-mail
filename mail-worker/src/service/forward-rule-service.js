@@ -1,6 +1,6 @@
 import orm from '../entity/orm';
 import { forwardRule } from '../entity/forward-rule';
-import { user } from '../entity/user';
+import user from '../entity/user';
 import { and, eq, desc } from 'drizzle-orm';
 import { t } from '../i18n/i18n';
 import BizError from '../error/biz-error';

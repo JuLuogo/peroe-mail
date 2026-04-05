@@ -90,7 +90,7 @@
                   <el-dropdown-menu>
                     <el-dropdown-item @click="openSetPwd(props.row)" >{{ $t('chgPwd') }}</el-dropdown-item>
                     <el-dropdown-item @click="openSetType(props.row)" >{{ $t('perm') }}</el-dropdown-item>
-                    <el-dropdown-item @click="openSetAvailDomain(props.row)" >{{ $t('availableDomains') }}</el-dropdown-item>
+                    <el-dropdown-item @click="openSetAvailDomain(props.row)" >{{ $t('forwardAvailDomains') }}</el-dropdown-item>
                     <template v-if="props.row.type !== 0">
                       <el-dropdown-item v-if="props.row.isDel !== 1" @click="setStatus(props.row)">
                         {{ setStatusName(props.row) }}
@@ -154,10 +154,10 @@
         </el-button>
       </div>
     </el-dialog>
-    <el-dialog class="dialog" v-model="setAvailDomainShow" :title="$t('availableDomains')" @closed="resetUserForm">
+    <el-dialog class="dialog" v-model="setAvailDomainShow" :title="$t('forwardAvailDomains')" @closed="resetUserForm">
       <div class="dialog-box">
-        <el-input v-model="userForm.availDomain" type="text" :placeholder="$t('availableDomainsPlaceholder')" autocomplete="off"/>
-        <div style="font-size: 12px; color: #999; margin-top: 5px;">{{ $t('availableDomainsTip') }}</div>
+        <el-input v-model="userForm.availDomain" type="text" :placeholder="$t('forwardAvailDomainsPlaceholder')" autocomplete="off"/>
+        <div style="font-size: 12px; color: #999; margin-top: 5px;">{{ $t('forwardAvailDomainsTip') }}</div>
         <el-button class="btn" :loading="settingLoading" type="primary" @click="setAvailDomain"
         >{{ $t('save') }}
         </el-button>
@@ -335,7 +335,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ion:globe-outline" width="20" height="20" />
-                <span>{{ t('availableDomains') }}</span>
+                <span>{{ t('forwardAvailDomains') }}</span>
               </div>
             </template>
           </el-dropdown-item>

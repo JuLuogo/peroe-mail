@@ -431,9 +431,9 @@ const en = {
     noForwardRules: 'No forwarding rules',
     enterDescription: 'Enter description (optional)',
     pleaseFillRequiredFields: 'Please fill in required fields',
-    availableDomains: 'Available Domains',
-    availableDomainsPlaceholder: 'Separate multiple domains with commas, leave empty to use role settings',
-    availableDomainsTip: 'Set domains that user can use for catch-all forwarding rules, empty uses role settings'
+    forwardAvailDomains: 'Available Domains',
+    forwardAvailDomainsPlaceholder: 'Separate multiple domains with commas, leave empty to use role settings',
+    forwardAvailDomainsTip: 'Set domains that user can use for catch-all forwarding rules, empty uses role settings'
 }
 
 export default en
