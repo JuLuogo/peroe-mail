@@ -108,19 +108,19 @@
     </el-dialog>
 
     <!-- 转发规则对话框 -->
-    <el-dialog v-model="ruleDialog.show" :title="ruleDialog.isEdit ? $t('editRule') : $t('addRule')">
-      <el-form :model="ruleDialog.form" label-width="100px">
+    <el-dialog v-model="ruleDialogVisible" :title="ruleDialogIsEdit ? $t('editRule') : $t('addRule')">
+      <el-form :model="ruleFormData" label-width="100px">
         <el-form-item :label="$t('pattern')">
-          <el-input v-model="ruleDialog.form.pattern" :placeholder="$t('patternPlaceholder')"/>
+          <el-input v-model="ruleFormData.pattern" :placeholder="$t('patternPlaceholder')"/>
           <div class="form-tip">{{ $t('patternTip') }}</div>
         </el-form-item>
         <el-form-item :label="$t('forwardTo')">
-          <el-input v-model="ruleDialog.form.forwardTo" :placeholder="$t('forwardToPlaceholder')"/>
+          <el-input v-model="ruleFormData.forwardTo" :placeholder="$t('forwardToPlaceholder')"/>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="ruleDialog.show = false">{{$t('cancel')}}</el-button>
-        <el-button type="primary" @click="submitRule" :loading="ruleDialog.loading">{{ $t('save') }}</el-button>
+        <el-button @click="ruleDialogVisible = false">{{$t('cancel')}}</el-button>
+        <el-button type="primary" @click="submitRule" :loading="ruleDialogLoading">{{ $t('save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -150,15 +150,14 @@ const forwardEnabled = computed({
   set: (val) => val
 }) // 是否启用转发
 const forwardRules = ref([])
-const ruleDialog = reactive({
-  show: false,
-  isEdit: false,
-  loading: false,
-  form: {
-    ruleId: null,
-    pattern: '',
-    forwardTo: ''
-  }
+// 对话框状态 - 使用独立的 ref 避免响应式问题
+const ruleDialogVisible = ref(false)
+const ruleDialogIsEdit = ref(false)
+const ruleDialogLoading = ref(false)
+const ruleFormData = reactive({
+  ruleId: null,
+  pattern: '',
+  forwardTo: ''
 })
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
@@ -372,60 +371,60 @@ async function submitTwoFactor() {
 
 // 转发规则相关函数
 async function loadForwardRules() {
+  // 用户登录后就显示转发规则区域，权限验证在后端进行
+  hasForwardDomain.value = true
   try {
     const rules = await forwardRuleList()
     forwardRules.value = rules
-    // 用户登录后就显示转发规则区域，权限验证在后端进行
-    hasForwardDomain.value = true
   } catch (e) {
     console.error('Failed to load forward rules:', e)
   }
 }
 
 function openAddRule() {
-  ruleDialog.isEdit = false
-  ruleDialog.form.ruleId = null
-  ruleDialog.form.pattern = ''
-  ruleDialog.form.forwardTo = ''
-  ruleDialog.show = true
+  ruleDialogIsEdit.value = false
+  ruleFormData.ruleId = null
+  ruleFormData.pattern = ''
+  ruleFormData.forwardTo = ''
+  ruleDialogVisible.value = true
 }
 
 function editRule(rule) {
-  ruleDialog.isEdit = true
-  ruleDialog.form.ruleId = rule.ruleId || null
-  ruleDialog.form.pattern = rule.pattern || ''
-  ruleDialog.form.forwardTo = rule.forwardTo || ''
-  ruleDialog.show = true
+  ruleDialogIsEdit.value = true
+  ruleFormData.ruleId = rule.ruleId || null
+  ruleFormData.pattern = rule.pattern || ''
+  ruleFormData.forwardTo = rule.forwardTo || ''
+  ruleDialogVisible.value = true
 }
 
 async function submitRule() {
-  if (!ruleDialog.form.pattern || !ruleDialog.form.forwardTo) {
+  if (!ruleFormData.pattern || !ruleFormData.forwardTo) {
     ElMessage.warning(t('pleaseFillRequiredFields'))
     return
   }
-  if (!ruleDialog.form.pattern.includes('@') || !ruleDialog.form.pattern.includes('*')) {
+  if (!ruleFormData.pattern.includes('@') || !ruleFormData.pattern.includes('*')) {
     ElMessage.warning(t('patternMustContainWildcard'))
     return
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(ruleDialog.form.forwardTo)) {
+  if (!emailRegex.test(ruleFormData.forwardTo)) {
     ElMessage.warning(t('forwardToEmailInvalid'))
     return
   }
-  ruleDialog.loading = true
+  ruleDialogLoading.value = true
   try {
-    if (ruleDialog.isEdit) {
-      await forwardRuleUpdate(ruleDialog.form)
+    if (ruleDialogIsEdit.value) {
+      await forwardRuleUpdate(ruleFormData)
     } else {
-      await forwardRuleAdd(ruleDialog.form)
+      await forwardRuleAdd(ruleFormData)
     }
-    ruleDialog.show = false
+    ruleDialogVisible.value = false
     ElMessage.success(t('saveSuccessMsg'))
     loadForwardRules()
   } catch (e) {
     console.error('Failed to save forward rule:', e)
   } finally {
-    ruleDialog.loading = false
+    ruleDialogLoading.value = false
   }
 }
 
