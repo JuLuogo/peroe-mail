@@ -117,9 +117,6 @@
         <el-form-item :label="$t('forwardTo')">
           <el-input v-model="ruleDialog.form.forwardTo" :placeholder="$t('forwardToPlaceholder')"/>
         </el-form-item>
-        <el-form-item :label="$t('priority')">
-          <el-input v-model="ruleDialog.form.priority" type="number" :min="0" :max="100"/>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="ruleDialog.show = false">{{$t('cancel')}}</el-button>
@@ -156,8 +153,7 @@ const ruleDialog = reactive({
   form: {
     ruleId: null,
     pattern: '',
-    forwardTo: '',
-    priority: 0
+    forwardTo: ''
   }
 })
 const setPwdLoading = ref(false)
@@ -387,8 +383,7 @@ function openAddRule() {
   ruleDialog.form = {
     ruleId: null,
     pattern: '',
-    forwardTo: '',
-    priority: 0
+    forwardTo: ''
   }
   ruleDialog.show = true
 }
@@ -398,8 +393,7 @@ function editRule(rule) {
   ruleDialog.form = {
     ruleId: rule.ruleId || null,
     pattern: rule.pattern || '',
-    forwardTo: rule.forwardTo || '',
-    priority: typeof rule.priority === 'number' ? rule.priority : 0
+    forwardTo: rule.forwardTo || ''
   }
   ruleDialog.show = true
 }
