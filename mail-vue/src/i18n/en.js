@@ -80,6 +80,8 @@ const en = {
     setForward: 'Set Forward',
     followGlobal: 'Follow Global',
     forwardEmailPlaceholder: 'Multiple emails separated by comma',
+    forwardEmailRequired: 'Forward email is required',
+    invalidForwardEmail: 'Invalid forward email format',
     btnBan: 'Ban',
     admin: 'Admin',
     addUser: 'Add User',

@@ -80,6 +80,8 @@ const zh = {
     setForward: '设置转发',
     followGlobal: '跟随全局',
     forwardEmailPlaceholder: '多个邮箱用,分开',
+    forwardEmailRequired: '请输入转发邮箱地址',
+    invalidForwardEmail: '转发邮箱格式不正确',
     btnBan: '禁用',
     admin: '超级管理员',
     addUser: '添加用户',
