@@ -9,7 +9,8 @@
       "Bash(npx pnpm:*)",
       "Bash(npx wrangler:*)",
       "Bash(timeout 8 pnpm dev)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)"
     ]
   }
 }
