@@ -54,6 +54,9 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: "./mail-worker/pnpm-lock.yaml"
 
+      - name: 🧹 清理前端缓存 / Clear frontend cache
+        run: rm -rf ../mail-vue/node_modules ../mail-vue/dist .vite
+
       - name: 📦 安装依赖 / Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: ./mail-worker
