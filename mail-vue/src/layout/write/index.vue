@@ -140,7 +140,7 @@ const contactsTabRef = ref({})
 const showContacts = ref(false)
 const mySelect = ref()
 let selectStatus = false
-const contactList = ref([])
+const addressBookList = ref([])
 const backReply = reactive({
   receiveEmail: [],
   subject: '',
@@ -169,7 +169,7 @@ const historyRecords = computed(() => writerStore.sendRecipientRecord.map(item =
 // 合并历史记录和联系人
 const allRecipients = computed(() => {
   const historyEmails = historyRecords.value.map(h => h.email)
-  const uniqueContacts = contactList.value.filter(c => !historyEmails.includes(c.email))
+  const uniqueContacts = addressBookList.value.filter(c => !historyEmails.includes(c.email))
   return [...historyRecords.value, ...uniqueContacts.map(item => ({email: item.email, name: item.name, isHistory: false}))]
 })
 
@@ -178,10 +178,10 @@ async function openContacts() {
   // 加载联系人列表
   try {
     const data = await contactList({ num: 1, size: 100 })
-    contactList.value = data.list || []
+    addressBookList.value = data.list || []
   } catch (e) {
     console.error('Failed to load contacts:', e)
-    contactList.value = []
+    addressBookList.value = []
   }
   nextTick(() => {
     // 选中已选择的收件人
