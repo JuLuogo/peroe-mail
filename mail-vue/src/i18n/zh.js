@@ -430,6 +430,7 @@ const zh = {
     patternTip: '* 匹配任意字符，如 *-99@99.com 可匹配 abc-99@99.com',
     patternMustContainWildcard: '模式必须包含通配符 * 和 @',
     forwardToEmailInvalid: '转发目标邮箱格式不正确',
+    forwardToMustBeOwnEmail: '转发目标必须是您自己的邮箱账号',
     noForwardRules: '暂无转发规则',
     enterDescription: '请输入描述（可选）',
     pleaseFillRequiredFields: '请填写必填字段',

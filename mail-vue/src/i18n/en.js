@@ -430,6 +430,7 @@ const en = {
     patternTip: '* matches any characters, e.g., *-99@99.com matches abc-99@99.com',
     patternMustContainWildcard: 'Pattern must contain wildcard * and @',
     forwardToEmailInvalid: 'Invalid forward email format',
+    forwardToMustBeOwnEmail: 'Forward target must be your own email account',
     noForwardRules: 'No forwarding rules',
     enterDescription: 'Enter description (optional)',
     pleaseFillRequiredFields: 'Please fill in required fields',

@@ -120,6 +120,7 @@ const en = {
 	},
 	forwardRuleParamInvalid: 'Rule parameters are incomplete',
 	forwardToEmailInvalid: 'Invalid forward email format',
+	forwardToMustBeOwnEmail: 'Forward target must be your own email account',
 	forwardPatternMustContainWildcard: 'Pattern must contain wildcard * and @',
 	forwardPatternDomainInvalid: 'The domain part of the pattern is invalid',
 	noPermission: 'No permission'

@@ -1,11 +1,13 @@
 import orm from '../entity/orm';
 import { forwardRule } from '../entity/forward-rule';
 import user from '../entity/user';
-import { and, eq, desc } from 'drizzle-orm';
+import { account } from '../entity/account';
+import { and, eq, desc, inArray } from 'drizzle-orm';
 import { t } from '../i18n/i18n';
 import BizError from '../error/biz-error';
 import emailUtils from '../utils/email-utils';
 import roleService from './role-service';
+import { isDel } from '../const/entity-const';
 
 const forwardRuleService = {
 
@@ -63,6 +65,15 @@ const forwardRuleService = {
 			throw new BizError(t('forwardPatternDomainInvalid'));
 		}
 
+		// 非管理员用户需要验证转发目标必须是自己的邮箱
+		if (userId !== 0) {
+			const userAccounts = await orm(c).select({ email: account.email }).from(account).where(and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL))).all();
+			const userEmails = userAccounts.map(a => a.email.toLowerCase());
+			if (!userEmails.includes(forwardTo.toLowerCase())) {
+				throw new BizError(t('forwardToMustBeOwnEmail'));
+			}
+		}
+
 		// 非管理员用户需要验证域名权限
 		if (userId !== 0) {
 			const availDomain = await this.getUserAvailDomain(c, userId);
@@ -117,6 +128,15 @@ const forwardRuleService = {
 
 		if (forwardTo && !emailUtils.isEmail(forwardTo)) {
 			throw new BizError(t('forwardToEmailInvalid'));
+		}
+
+		// 如果更新了转发目标，非管理员用户需要验证转发目标必须是自己的邮箱
+		if (forwardTo && rule.userId !== 0) {
+			const userAccounts = await orm(c).select({ email: account.email }).from(account).where(and(eq(account.userId, rule.userId), eq(account.isDel, isDel.NORMAL))).all();
+			const userEmails = userAccounts.map(a => a.email.toLowerCase());
+			if (!userEmails.includes(forwardTo.toLowerCase())) {
+				throw new BizError(t('forwardToMustBeOwnEmail'));
+			}
 		}
 
 		await orm(c).update(forwardRule).set({

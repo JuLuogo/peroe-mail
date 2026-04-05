@@ -120,6 +120,7 @@ const zh = {
 	},
 	forwardRuleParamInvalid: '规则参数不完整',
 	forwardToEmailInvalid: '转发目标邮箱格式不正确',
+	forwardToMustBeOwnEmail: '转发目标必须是您自己的邮箱账号',
 	forwardPatternMustContainWildcard: '模式必须包含通配符 * 和 @',
 	forwardPatternDomainInvalid: '模式的域名部分无效',
 	noPermission: '无权操作'
