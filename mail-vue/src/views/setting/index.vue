@@ -392,11 +392,13 @@ async function loadForwardRules() {
 }
 
 function openAddRule() {
+  console.log('openAddRule called', ruleDialogVisible.value)
   isEditRule.value = false
   currentRuleId.value = null
   rulePattern.value = ''
   ruleForwardTo.value = ''
   ruleDialogVisible.value = true
+  console.log('After setting', ruleDialogVisible.value)
 }
 
 function handleDialogClose() {
