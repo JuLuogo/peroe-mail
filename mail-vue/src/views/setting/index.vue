@@ -107,28 +107,20 @@
     </el-dialog>
 
     <!-- 添加/编辑规则对话框 -->
-    <div v-if="ruleDialogVisible" class="my-dialog-overlay" @click.self="ruleDialogVisible = false">
-      <div class="my-dialog">
-        <div class="my-dialog-header">
-          <span>{{ isEditRule ? $t('editRule') : $t('addRule') }}</span>
-          <span @click="ruleDialogVisible = false" style="cursor:pointer;">X</span>
-        </div>
-        <div class="my-dialog-body">
-          <div style="margin-bottom:15px;">
-            <div style="margin-bottom:5px;">{{ $t('pattern') }}</div>
-            <input type="text" v-model="rulePattern" :placeholder="$t('patternPlaceholder')" style="width:100%;padding:8px;" />
-          </div>
-          <div>
-            <div style="margin-bottom:5px;">{{ $t('forwardTo') }}</div>
-            <input type="text" v-model="ruleForwardTo" :placeholder="$t('forwardToPlaceholder')" style="width:100%;padding:8px;" />
-          </div>
-        </div>
-        <div class="my-dialog-footer">
-          <button @click="ruleDialogVisible = false" style="padding:8px 16px;">{{ $t('cancel') }}</button>
-          <button @click="handleSaveRule" style="padding:8px 16px;background:#409eff;color:#fff;border:none;">{{ $t('save') }}</button>
-        </div>
+    <el-dialog v-model="ruleDialogVisible" :title="isEditRule ? $t('editRule') : $t('addRule')" width="450">
+      <div style="margin-bottom:15px;">
+        <div style="margin-bottom:5px;">{{ $t('pattern') }}</div>
+        <el-input v-model="rulePattern" :placeholder="$t('patternPlaceholder')" />
       </div>
-    </div>
+      <div>
+        <div style="margin-bottom:5px;">{{ $t('forwardTo') }}</div>
+        <el-input v-model="ruleForwardTo" :placeholder="$t('forwardToPlaceholder')" />
+      </div>
+      <template #footer>
+        <el-button @click="ruleDialogVisible = false">{{ $t('cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveRule" :loading="ruleLoading">{{ $t('save') }}</el-button>
+      </template>
+    </el-dialog>
 
   </div>
 </template>
@@ -396,12 +388,6 @@ function openAddRule() {
   console.log('After setting', ruleDialogVisible.value)
 }
 
-function handleDialogClose() {
-  rulePattern.value = ''
-  ruleForwardTo.value = ''
-  currentRuleId.value = null
-}
-
 function editRule(rule) {
   isEditRule.value = true
   currentRuleId.value = rule.ruleId || null
@@ -648,45 +634,5 @@ async function toggleForward(val) {
     }
   }
 
-  .my-dialog-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
   }
-
-  .my-dialog {
-    background: #fff;
-    border-radius: 8px;
-    width: 450px;
-    max-width: 90vw;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  }
-
-  .my-dialog-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid #eee;
-  }
-
-  .my-dialog-body {
-    padding: 20px;
-  }
-
-  .my-dialog-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 20px;
-    border-top: 1px solid #eee;
-  }
-}
 </style>
