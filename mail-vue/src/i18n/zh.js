@@ -429,7 +429,7 @@ const zh = {
     patternPlaceholder: '输入匹配模式',
     forwardToPlaceholder: '输入转发目标邮箱',
     patternTip: '星号匹配任意字符',
-    patternMustContainWildcard: '模式必须包含星号和@符号',
+    patternMustContainWildcard: '模式必须包含星号和AT符号',
     forwardToEmailInvalid: '转发目标邮箱格式不正确',
     forwardToMustBeOwnEmail: '转发目标必须是您自己的邮箱账号',
     noForwardRules: '暂无转发规则',

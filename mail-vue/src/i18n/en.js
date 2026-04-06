@@ -429,7 +429,7 @@ const en = {
     patternPlaceholder: 'Enter pattern',
     forwardToPlaceholder: 'Enter forward email',
     patternTip: 'Asterisk matches any characters',
-    patternMustContainWildcard: 'Pattern must contain asterisk and @',
+    patternMustContainWildcard: 'Pattern must contain asterisk and AT',
     forwardToEmailInvalid: 'Invalid forward email format',
     forwardToMustBeOwnEmail: 'Forward target must be your own email account',
     noForwardRules: 'No forwarding rules',
