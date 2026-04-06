@@ -11,7 +11,14 @@
       "Bash(timeout 8 pnpm dev)",
       "Bash(pnpm build:*)",
       "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
-      "Bash(grep -o '.\\\\{0,200\\\\}patternTip.\\\\{0,200\\\\}' \"C:\\\\Users\\\\juluo\\\\Desktop\\\\index-CAYI_n8x.js\")"
+      "Bash(grep -o '.\\\\{0,200\\\\}patternTip.\\\\{0,200\\\\}' \"C:\\\\Users\\\\juluo\\\\Desktop\\\\index-CAYI_n8x.js\")",
+      "Bash(node --check \"d:/github/cloud-mail/mail-vue/src/i18n/zh.js\")",
+      "Bash(node --check \"d:/github/cloud-mail/mail-vue/src/i18n/en.js\")",
+      "Bash(grep -n \"@$\" \"d:/github/cloud-mail/mail-vue/src/i18n/zh.js\")",
+      "Bash(node -e \"const zh = require\\('./src/i18n/zh.js'\\); console.log\\('patternMustContainWildcard:', zh.patternMustContainWildcard\\)\")",
+      "Bash(node -e \"const zh = require\\('./src/i18n/zh.js'\\); console.log\\(Object.keys\\(zh\\).slice\\(-10\\)\\)\")",
+      "Bash(node --experimental-vm-modules -e \"import zh from './src/i18n/zh.js'; console.log\\(Object.keys\\(zh\\).slice\\(-10\\)\\)\")",
+      "Bash(node --input-type=module -e ':*)"
     ]
   }
 }

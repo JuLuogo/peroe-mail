@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <!-- 转发规则配置 -->
+    <!-- 转发规则配置 - 已暂时禁用
     <div class="forward-rules-section" v-if="hasForwardDomain">
       <div class="title">{{$t('forwardRules')}}</div>
       <div class="item">
@@ -70,6 +70,7 @@
         </el-button>
       </div>
     </div>
+    -->
 
     <div class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
