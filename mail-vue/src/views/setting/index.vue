@@ -110,7 +110,7 @@
     <el-dialog v-model="ruleDialogVisible" title="Forward Rule" width="450">
       <div style="margin-bottom:15px;">
         <div style="margin-bottom:5px;">{{ $t('pattern') }}</div>
-        <el-input v-model="rulePattern" placeholder="e.g., *-99@99.com" />
+        <el-input v-model="rulePattern" :placeholder="$t('patternPlaceholder')" />
       </div>
       <div>
         <div style="margin-bottom:5px;">Forward To</div>
