@@ -412,16 +412,16 @@ function editRule(rule) {
 
 async function handleSaveRule() {
   if (!rulePattern.value || !ruleForwardTo.value) {
-    ElMessage.warning(t('pleaseFillRequiredFields'))
+    ElMessage.warning('Please fill in all required fields')
     return
   }
   if (!rulePattern.value.includes('@') || !rulePattern.value.includes('*')) {
-    ElMessage.warning(t('patternMustContainWildcard'))
+    ElMessage.warning('Pattern must contain wildcard * and @')
     return
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(ruleForwardTo.value)) {
-    ElMessage.warning(t('forwardToEmailInvalid'))
+    ElMessage.warning('Invalid forward email format')
     return
   }
   ruleLoading.value = true
@@ -437,10 +437,11 @@ async function handleSaveRule() {
       await forwardRuleAdd(data)
     }
     ruleDialogVisible.value = false
-    ElMessage.success(t('saveSuccessMsg'))
+    ElMessage.success('Save success')
     loadForwardRules()
   } catch (e) {
     console.error('Failed to save forward rule:', e)
+    ElMessage.error(e?.message || 'Save failed')
   } finally {
     ruleLoading.value = false
   }
