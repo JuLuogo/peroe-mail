@@ -107,6 +107,35 @@
       </template>
     </el-dialog>
 
+    <!-- 添加/编辑规则对话框 -->
+    <Teleport to="body">
+      <div v-if="ruleDialogVisible" class="rule-dialog-overlay" @click.self="ruleDialogVisible = false">
+        <div class="rule-dialog">
+          <div class="rule-dialog-header">
+            <span class="rule-dialog-title">{{ isEditRule ? t('editRule') : t('addRule') }}</span>
+            <button class="rule-dialog-close" @click="ruleDialogVisible = false">&times;</button>
+          </div>
+          <div class="rule-dialog-body">
+            <div class="rule-form-group">
+              <label>{{ t('pattern') }}</label>
+              <input type="text" v-model="rulePattern" :placeholder="t('patternPlaceholder')" />
+              <p class="rule-form-tip">{{ t('patternTip') }}</p>
+            </div>
+            <div class="rule-form-group">
+              <label>{{ t('forwardTo') }}</label>
+              <input type="text" v-model="ruleForwardTo" :placeholder="t('forwardToPlaceholder')" />
+            </div>
+          </div>
+          <div class="rule-dialog-footer">
+            <button class="btn-cancel" @click="ruleDialogVisible = false">{{ t('cancel') }}</button>
+            <button class="btn-primary" @click="handleSaveRule" :disabled="ruleLoading">
+              {{ ruleLoading ? '...' : t('save') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 <script setup>
@@ -619,6 +648,121 @@ async function toggleForward(val) {
         outline: none;
         border-color: var(--el-color-primary);
       }
+    }
+  }
+
+  .rule-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+
+  .rule-dialog {
+    background: var(--el-bg-color);
+    border-radius: 8px;
+    width: 450px;
+    max-width: 90vw;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .rule-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--el-border-color);
+  }
+
+  .rule-dialog-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .rule-dialog-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--el-text-color-secondary);
+    padding: 0;
+    line-height: 1;
+  }
+
+  .rule-dialog-body {
+    padding: 20px;
+  }
+
+  .rule-form-group {
+    margin-bottom: 16px;
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--el-text-color-regular);
+    }
+    input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--el-border-color);
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      &:focus {
+        outline: none;
+        border-color: var(--el-color-primary);
+      }
+    }
+    .rule-form-tip {
+      font-size: 12px;
+      color: #999;
+      margin-top: 4px;
+    }
+  }
+
+  .rule-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--el-border-color);
+  }
+
+  .btn-cancel,
+  .btn-primary {
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .btn-cancel {
+    background: none;
+    border: 1px solid var(--el-border-color);
+    color: var(--el-text-color-regular);
+    &:hover {
+      border-color: var(--el-color-primary);
+      color: var(--el-color-primary);
+    }
+  }
+
+  .btn-primary {
+    background: var(--el-color-primary);
+    border: 1px solid var(--el-color-primary);
+    color: #fff;
+    &:hover {
+      opacity: 0.9;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   }
 }
