@@ -86,57 +86,49 @@ const sesService = {
         const endpoint = `https://email.${region}.amazonaws.com`;
         const path = '/v2/email/outbound-emails';
 
-        // 构建请求参数
-        const requestBody = {
-            FromEmailAddress: from,
-            Destination: {
-                ToAddresses: to
-            },
-            Content: {
-                Simple: {
-                    Subject: {
-                        Data: subject,
-                        Charset: 'UTF-8'
-                    },
-                    Body: {}
-                }
-            }
-        };
+        // 构建请求参数 - 使用 form-urlencoded 格式
+        const requestBody = new URLSearchParams();
+        requestBody.append('FromEmailAddress', from);
+        requestBody.append('Destination.ToAddresses.member.1', to);
+        requestBody.append('Content.Simple.Subject.Data', subject);
+        requestBody.append('Content.Simple.Subject.Charset', 'UTF-8');
 
         if (text) {
-            requestBody.Content.Simple.Body.Text = {
-                Data: text,
-                Charset: 'UTF-8'
-            };
+            requestBody.append('Content.Simple.Body.Text.Data', text);
+            requestBody.append('Content.Simple.Body.Text.Charset', 'UTF-8');
         }
 
         if (html) {
-            requestBody.Content.Simple.Body.Html = {
-                Data: html,
-                Charset: 'UTF-8'
-            };
+            requestBody.append('Content.Simple.Body.Html.Data', html);
+            requestBody.append('Content.Simple.Body.Html.Charset', 'UTF-8');
         }
 
-        const bodyString = JSON.stringify(requestBody);
+        const bodyString = requestBody.toString();
 
-        // AWS Signature V4 签名
+        // AWS Signature V4 签名 - 必须在发送请求时生成时间戳
         function getAmzDate(date = new Date()) {
-            return date.toISOString().replace(/[:-]|\.\d{3}/g, '')
+            const y = date.getUTCFullYear();
+            const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(date.getUTCDate()).padStart(2, '0');
+            const h = String(date.getUTCHours()).padStart(2, '0');
+            const min = String(date.getUTCMinutes()).padStart(2, '0');
+            const s = String(date.getUTCSeconds()).padStart(2, '0');
+            return `${y}${m}${d}T${h}${min}${s}Z`;
         }
-        const now = new Date();
-        const amzDate = getAmzDate(now);
-        const date = amzDate.slice(0, 8);
+        const amzDate = getAmzDate();
+        const dateStamp = amzDate.slice(0, 8);
 
         // 调试日志
         console.log("amzDate:", amzDate);
 
         const queryParams = {};
+        // Header 必须按字母顺序排列
         const headers = {
+            'content-length': bodyString.length.toString(),
+            'content-type': 'application/x-www-form-urlencoded',
             'host': `email.${region}.amazonaws.com`,
-            'x-amz-date': amzDate,
             'x-amz-content-sha256': await awsSignatureV4.hashSHA256(bodyString),
-            'content-type': 'application/json',
-            'content-length': bodyString.length.toString()
+            'x-amz-date': amzDate
         };
 
         const canonicalRequest = await awsSignatureV4.generateCanonicalRequest(
@@ -147,7 +139,7 @@ const sesService = {
             bodyString
         );
 
-        const credentialScope = `${date}/${region}/ses/aws4_request`;
+        const credentialScope = `${dateStamp}/${region}/ses/aws4_request`;
         const canonicalRequestHash = await awsSignatureV4.hashSHA256(canonicalRequest);
         const stringToSign = awsSignatureV4.generateStringToSign(
             'AWS4-HMAC-SHA256',
@@ -158,7 +150,7 @@ const sesService = {
 
         const signingKey = await awsSignatureV4.generateSigningKey(
             secretKey,
-            date,
+            dateStamp,
             region,
             'ses'
         );
