@@ -11,6 +11,8 @@ import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import forwardRuleService from '../service/forward-rule-service';
+import orm from '../entity/orm';
+import email from '../entity/email';
 
 export async function email(message, env, ctx) {
 
@@ -25,7 +27,8 @@ export async function email(message, env, ctx) {
 			ruleEmail,
 			ruleType,
 			r2Domain,
-			noRecipient
+			noRecipient,
+			domainList
 		} = await settingService.query({ env });
 
 		if (receive === settingConst.receive.CLOSE) {
@@ -167,40 +170,98 @@ export async function email(message, env, ctx) {
 
 		// Catch-all 规则转发
 		if (forwardRule) {
-			try {
-				console.log(`Catch-all 匹配: ${message.to} -> ${forwardRule.forwardTo}`);
-				const forwardTo = forwardRule.forwardTo.trim();
-				console.log(`[Catch-all] 开始转发到: ${forwardTo}`);
-				await message.forward(forwardTo);
-				console.log(`[Catch-all] 转发成功`);
-				// 保存成功日志到 KV
+			const forwardTo = forwardRule.forwardTo.trim();
+			const targetDomain = '@' + emailUtils.getDomain(forwardTo);
+			const isInternalDomain = domainList.includes(targetDomain);
+
+			console.log(`[Catch-all] 匹配: ${message.to} -> ${forwardTo}, 内部域名: ${isInternalDomain}`);
+
+			if (isInternalDomain) {
+				// 内部域名：直接保存邮件到目标用户收件箱
 				try {
-					const kvKey = `forward_success_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-					await env.kv.put(kvKey, JSON.stringify({
-						time: new Date().toISOString(),
-						from: message.to,
-						to: forwardTo,
-						rule: forwardRule,
-						status: 'success'
-					}), { expirationTtl: 300 });
-				} catch (kvErr) {
-					console.error(`[Catch-all] KV日志保存失败: ${kvErr}`);
+					const targetAccount = await accountService.selectByEmailIncludeDel({ env }, forwardTo);
+					if (targetAccount) {
+						// 构建邮件数据，直接保存到目标用户收件箱
+						const emailData = {
+							toEmail: forwardTo,
+							toName: emailUtils.getName(forwardTo),
+							sendEmail: email.from.address,
+							name: email.from.name || emailUtils.getName(email.from.address),
+							subject: email.subject,
+							content: email.html,
+							text: email.text,
+							cc: email.cc ? JSON.stringify(email.cc) : '[]',
+							bcc: email.bcc ? JSON.stringify(email.bcc) : '[]',
+							recipient: JSON.stringify(email.to),
+							inReplyTo: email.inReplyTo,
+							relation: email.references,
+							messageId: email.messageId,
+							userId: targetAccount.userId,
+							accountId: targetAccount.accountId,
+							isDel: isDel.NORMAL,
+							status: emailConst.status.RECEIVE
+						};
+
+						await orm({ env }).insert(email).values(emailData).returning().get();
+						console.log(`[Catch-all] 内部转发成功: ${message.to} -> ${forwardTo}`);
+
+						// 保存成功日志到 KV
+						try {
+							const kvKey = `forward_success_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+							await env.kv.put(kvKey, JSON.stringify({
+								time: new Date().toISOString(),
+								from: message.to,
+								to: forwardTo,
+								rule: forwardRule,
+								status: 'success',
+								method: 'internal'
+							}), { expirationTtl: 300 });
+						} catch (kvErr) {
+							console.error(`[Catch-all] KV日志保存失败: ${kvErr}`);
+						}
+					} else {
+						console.error(`[Catch-all] 内部转发失败: 目标账户不存在 ${forwardTo}`);
+					}
+				} catch (e) {
+					console.error(`[Catch-all] 内部转发失败: ${e}`);
 				}
-			} catch (e) {
-				console.error(`[Catch-all] 转发失败: ${e}`);
-				// 保存失败日志到 KV
+			} else {
+				// 外部域名：使用 message.forward() 发送
 				try {
-					const kvKey = `forward_error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-					await env.kv.put(kvKey, JSON.stringify({
-						time: new Date().toISOString(),
-						from: message.to,
-						to: forwardRule.forwardTo,
-						rule: forwardRule,
-						status: 'error',
-						error: String(e)
-					}), { expirationTtl: 300 });
-				} catch (kvErr) {
-					console.error(`[Catch-all] KV错误日志保存失败: ${kvErr}`);
+					console.log(`[Catch-all] 开始转发到: ${forwardTo}`);
+					await message.forward(forwardTo);
+					console.log(`[Catch-all] 转发成功`);
+
+					// 保存成功日志到 KV
+					try {
+						const kvKey = `forward_success_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+						await env.kv.put(kvKey, JSON.stringify({
+							time: new Date().toISOString(),
+							from: message.to,
+							to: forwardTo,
+							rule: forwardRule,
+							status: 'success',
+							method: 'forward'
+						}), { expirationTtl: 300 });
+					} catch (kvErr) {
+						console.error(`[Catch-all] KV日志保存失败: ${kvErr}`);
+					}
+				} catch (e) {
+					console.error(`[Catch-all] 转发失败: ${e}`);
+					// 保存失败日志到 KV
+					try {
+						const kvKey = `forward_error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+						await env.kv.put(kvKey, JSON.stringify({
+							time: new Date().toISOString(),
+							from: message.to,
+							to: forwardRule.forwardTo,
+							rule: forwardRule,
+							status: 'error',
+							error: String(e)
+						}), { expirationTtl: 300 });
+					} catch (kvErr) {
+						console.error(`[Catch-all] KV错误日志保存失败: ${kvErr}`);
+					}
 				}
 			}
 		}
