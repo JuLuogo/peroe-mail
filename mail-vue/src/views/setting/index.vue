@@ -107,33 +107,28 @@
     </el-dialog>
 
     <!-- 添加/编辑规则对话框 -->
-    <Teleport to="body">
-      <div v-if="ruleDialogVisible" class="rule-dialog-overlay" @click.self="ruleDialogVisible = false">
-        <div class="rule-dialog">
-          <div class="rule-dialog-header">
-            <span class="rule-dialog-title">{{ isEditRule ? 'Edit Rule' : 'Add Rule' }}</span>
-            <button class="rule-dialog-close" @click="ruleDialogVisible = false">&times;</button>
+    <div v-if="ruleDialogVisible" class="my-dialog-overlay" @click.self="ruleDialogVisible = false">
+      <div class="my-dialog">
+        <div class="my-dialog-header">
+          <span>{{ isEditRule ? 'Edit Rule' : 'Add Rule' }}</span>
+          <span @click="ruleDialogVisible = false" style="cursor:pointer;">X</span>
+        </div>
+        <div class="my-dialog-body">
+          <div style="margin-bottom:15px;">
+            <div style="margin-bottom:5px;">Pattern</div>
+            <input type="text" v-model="rulePattern" placeholder="e.g. *-99@99.com" style="width:100%;padding:8px;" />
           </div>
-          <div class="rule-dialog-body">
-            <div class="rule-form-group">
-              <label>Pattern</label>
-              <input type="text" v-model="rulePattern" placeholder="e.g. *-99@99.com" />
-              <p class="rule-form-tip">* matches any characters</p>
-            </div>
-            <div class="rule-form-group">
-              <label>Forward To</label>
-              <input type="text" v-model="ruleForwardTo" placeholder="e.g. a@juluo.work" />
-            </div>
-          </div>
-          <div class="rule-dialog-footer">
-            <button class="btn-cancel" @click="ruleDialogVisible = false">Cancel</button>
-            <button class="btn-primary" @click="handleSaveRule" :disabled="ruleLoading">
-              {{ ruleLoading ? '...' : 'Save' }}
-            </button>
+          <div>
+            <div style="margin-bottom:5px;">Forward To</div>
+            <input type="text" v-model="ruleForwardTo" placeholder="e.g. a@juluo.work" style="width:100%;padding:8px;" />
           </div>
         </div>
+        <div class="my-dialog-footer">
+          <button @click="ruleDialogVisible = false" style="padding:8px 16px;">Cancel</button>
+          <button @click="handleSaveRule" style="padding:8px 16px;background:#409eff;color:#fff;border:none;">Save</button>
+        </div>
       </div>
-    </Teleport>
+    </div>
 
   </div>
 </template>
@@ -652,7 +647,7 @@ async function toggleForward(val) {
     }
   }
 
-  .rule-dialog-overlay {
+  .my-dialog-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -662,109 +657,35 @@ async function toggleForward(val) {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
+    z-index: 9999;
   }
 
-  .rule-dialog {
-    background: var(--el-bg-color);
+  .my-dialog {
+    background: #fff;
     border-radius: 8px;
     width: 450px;
     max-width: 90vw;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
 
-  .rule-dialog-header {
+  .my-dialog-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--el-border-color);
+    border-bottom: 1px solid #eee;
   }
 
-  .rule-dialog-title {
-    font-size: 16px;
-    font-weight: 600;
-  }
-
-  .rule-dialog-close {
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: var(--el-text-color-secondary);
-    padding: 0;
-    line-height: 1;
-  }
-
-  .rule-dialog-body {
+  .my-dialog-body {
     padding: 20px;
   }
 
-  .rule-form-group {
-    margin-bottom: 16px;
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 8px;
-      color: var(--el-text-color-regular);
-    }
-    input {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid var(--el-border-color);
-      border-radius: 4px;
-      font-size: 14px;
-      box-sizing: border-box;
-      &:focus {
-        outline: none;
-        border-color: var(--el-color-primary);
-      }
-    }
-    .rule-form-tip {
-      font-size: 12px;
-      color: #999;
-      margin-top: 4px;
-    }
-  }
-
-  .rule-dialog-footer {
+  .my-dialog-footer {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 20px;
-    border-top: 1px solid var(--el-border-color);
-  }
-
-  .btn-cancel,
-  .btn-primary {
-    padding: 8px 20px;
-    border-radius: 4px;
-    font-size: 14px;
-    cursor: pointer;
-  }
-
-  .btn-cancel {
-    background: none;
-    border: 1px solid var(--el-border-color);
-    color: var(--el-text-color-regular);
-    &:hover {
-      border-color: var(--el-color-primary);
-      color: var(--el-color-primary);
-    }
-  }
-
-  .btn-primary {
-    background: var(--el-color-primary);
-    border: 1px solid var(--el-color-primary);
-    color: #fff;
-    &:hover {
-      opacity: 0.9;
-    }
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
+    border-top: 1px solid #eee;
   }
 }
 </style>
