@@ -240,11 +240,11 @@ const forwardRuleService = {
 	},
 
 	/**
-	 * 查找匹配邮件地址的转发规则
+	 * 查找匹配邮件地址的所有转发规则
 	 * @param {string} email - 邮件地址
-	 * @returns {Object|null} 匹配的规则
+	 * @returns {Array} 匹配的规则数组
 	 */
-	async findMatchingRule(c, email) {
+	async findMatchingRules(c, email) {
 		const debugInfo = [];
 		const log = (msg) => {
 			const line = `[findMatchingRule] ${msg}`;
@@ -255,6 +255,8 @@ const forwardRuleService = {
 		const rules = await this.getEnabledRules(c);
 		log(`查找邮箱 ${email} 的匹配规则，共 ${rules.length} 条规则`);
 
+		const matchedRules = [];
+
 		for (const rule of rules) {
 			const matchResult = this.matchWildcardEmail(email, rule.pattern);
 			log(`规则 ${rule.pattern} vs ${email} = ${matchResult}`);
@@ -264,9 +266,9 @@ const forwardRuleService = {
 
 			// 全局规则(userId=0)直接匹配
 			if (rule.userId === 0) {
-				log(`全局规则匹配，userId=0，直接返回`);
-				await this.saveDebugLog(c, email, debugInfo);
-				return rule;
+				log(`全局规则匹配，userId=0，加入结果集`);
+				matchedRules.push(rule);
+				continue;
 			}
 
 			// 用户规则需要验证域名权限
@@ -285,14 +287,13 @@ const forwardRuleService = {
 				continue;
 			}
 
-			log(`用户规则匹配，返回`);
-			await this.saveDebugLog(c, email, debugInfo);
-			return rule;
+			log(`用户规则匹配，加入结果集`);
+			matchedRules.push(rule);
 		}
 
-		log(`未找到匹配规则`);
+		log(`共匹配到 ${matchedRules.length} 条规则`);
 		await this.saveDebugLog(c, email, debugInfo);
-		return null;
+		return matchedRules;
 	},
 
 	/**
