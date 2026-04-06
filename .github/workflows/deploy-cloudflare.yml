@@ -216,6 +216,13 @@ jobs:
           sed -i "s|\${D1_DATABASE_ID}|$D1_ID|g" "$CONFIG_FILE"
           echo "✅ Setup completed."
 
+      - name: 🎨 构建前端 / Build frontend
+        run: |
+          echo "🎨 Starting frontend build..."
+          pnpm --prefix ../mail-vue install
+          pnpm --prefix ../mail-vue run build
+          echo "✅ Frontend build completed."
+
       - name: 🚀 开始部署 / Start deployment
         id: deploy
         working-directory: ./mail-worker
