@@ -188,6 +188,25 @@ const roleService = {
 		return orm(c).select(role).from(user).leftJoin(role, eq(role.roleId, user.type)).where(eq(user.userId, userId)).get();
 	},
 
+	/**
+	 * 通配符匹配函数
+	 * 支持 * 匹配任意字符，? 匹配单个字符
+	 * @param {string} pattern - 通配符模式，如 *-99@99.com 或 juluo.work
+	 * @param {string} text - 要匹配的文本，如 999-99@99.com 或 foo@juluo.work
+	 * @returns {boolean}
+	 */
+	wildcardMatch(pattern, text) {
+		// 将通配符模式转换为正则表达式
+		// * 匹配任意字符（包括0个）
+		// ? 匹配单个字符
+		const regexPattern = pattern
+			.replace(/[.+^${}()|[\]\\]/g, '\\$&') // 转义正则特殊字符
+			.replace(/\*/g, '.*')
+			.replace(/\?/g, '.');
+		const regex = new RegExp(`^${regexPattern}$`, 'i');
+		return regex.test(text);
+	},
+
 	hasAvailDomainPerm(availDomain, email) {
 
 		availDomain = availDomain.split(',').filter(item => item !== '');
@@ -196,12 +215,20 @@ const roleService = {
 			return true
 		}
 
+		const emailLower = email.toLowerCase();
 		const availIndex = availDomain.findIndex(item => {
-			const domain = emailUtils.getDomain(email.toLowerCase());
-			const availDomainItem = item.toLowerCase();
-			console.log(domain,availDomainItem)
-			return domain === availDomainItem
-		})
+			const availDomainItem = item.toLowerCase().trim();
+			if (!availDomainItem) {
+				return false;
+			}
+			// 如果 availDomainItem 包含 @，则作为完整邮箱模式进行通配符匹配
+			if (availDomainItem.includes('@')) {
+				return this.wildcardMatch(availDomainItem, emailLower);
+			}
+			// 否则只匹配域名部分
+			const domain = emailUtils.getDomain(emailLower);
+			return domain === availDomainItem;
+		});
 
 		return availIndex > -1
 	},
