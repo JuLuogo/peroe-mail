@@ -12,7 +12,7 @@ import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import forwardRuleService from '../service/forward-rule-service';
 import orm from '../entity/orm';
-import email from '../entity/email';
+import emailEntity from '../entity/email';
 
 export async function email(message, env, ctx) {
 
@@ -202,7 +202,7 @@ export async function email(message, env, ctx) {
 							status: emailConst.status.RECEIVE
 						};
 
-						await orm({ env }).insert(email).values(emailData).returning().get();
+						await orm({ env }).insert(emailEntity).values(emailData).returning().get();
 						console.log(`[Catch-all] 内部转发成功: ${message.to} -> ${forwardTo}`);
 
 						// 保存成功日志到 KV
