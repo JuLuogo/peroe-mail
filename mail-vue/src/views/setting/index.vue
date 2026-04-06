@@ -107,18 +107,18 @@
     </el-dialog>
 
     <!-- 添加/编辑规则对话框 -->
-    <el-dialog v-model="ruleDialogVisible" title="Forward Rule" width="450">
+    <el-dialog v-model="ruleDialogVisible" :title="isEditRule ? $t('editRule') : $t('addRule')" width="450">
       <div style="margin-bottom:15px;">
         <div style="margin-bottom:5px;">{{ $t('pattern') }}</div>
         <el-input v-model="rulePattern" :placeholder="$t('patternPlaceholder')" />
       </div>
       <div>
-        <div style="margin-bottom:5px;">Forward To</div>
-        <el-input v-model="ruleForwardTo" placeholder="e.g., a@juluo.work" />
+        <div style="margin-bottom:5px;">{{ $t('forwardTo') }}</div>
+        <el-input v-model="ruleForwardTo" :placeholder="$t('forwardToPlaceholder')" />
       </div>
       <template #footer>
-        <el-button @click="ruleDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="handleSaveRule" :loading="ruleLoading">Save</el-button>
+        <el-button @click="ruleDialogVisible = false">{{ $t('cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveRule" :loading="ruleLoading">{{ $t('save') }}</el-button>
       </template>
     </el-dialog>
 
