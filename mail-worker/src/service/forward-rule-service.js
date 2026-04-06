@@ -243,32 +243,42 @@ const forwardRuleService = {
 	 */
 	async findMatchingRule(c, email) {
 		const rules = await this.getEnabledRules(c);
+		console.log(`[findMatchingRule] 查找邮箱 ${email} 的匹配规则，共 ${rules.length} 条规则`);
 
 		for (const rule of rules) {
-			if (!this.matchWildcardEmail(email, rule.pattern)) {
+			const matchResult = this.matchWildcardEmail(email, rule.pattern);
+			console.log(`[findMatchingRule] 规则 ${rule.pattern} vs ${email} = ${matchResult}`);
+			if (!matchResult) {
 				continue;
 			}
 
 			// 全局规则(userId=0)直接匹配
 			if (rule.userId === 0) {
+				console.log(`[findMatchingRule] 全局规则匹配，返回`);
 				return rule;
 			}
 
 			// 用户规则需要验证域名权限
 			const availDomain = await this.getUserAvailDomain(c, rule.userId);
+			console.log(`[findMatchingRule] 用户规则，availDomain=${availDomain}`);
 			if (!roleService.hasAvailDomainPerm(availDomain, email)) {
+				console.log(`[findMatchingRule] 用户规则域名权限不匹配，跳过`);
 				continue;
 			}
 
 			// 检查用户的 forwardStatus 是否开启
 			const ruleOwner = await orm(c).select({ forwardStatus: user.forwardStatus }).from(user).where(eq(user.userId, rule.userId)).get();
+			console.log(`[findMatchingRule] 用户 forwardStatus=${ruleOwner?.forwardStatus}`);
 			if (!ruleOwner || ruleOwner.forwardStatus !== 1) {
+				console.log(`[findMatchingRule] 用户转发未开启，跳过`);
 				continue;
 			}
 
+			console.log(`[findMatchingRule] 用户规则匹配，返回`);
 			return rule;
 		}
 
+		console.log(`[findMatchingRule] 未找到匹配规则`);
 		return null;
 	}
 };
