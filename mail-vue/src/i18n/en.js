@@ -38,6 +38,7 @@ const en = {
     invalidTwoFactorCodeMsg: 'Please enter a 6-digit verification code',
     cancel: 'Cancel',
     saveSuccessMsg: 'Saved successfully',
+    saveFailedMsg: 'Save failed',
     delSuccessMsg: 'Deleted successfully',
     analytics: 'Analytics',
     allUsers: 'All Users',

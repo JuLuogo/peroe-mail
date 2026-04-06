@@ -38,6 +38,7 @@ const zh = {
     invalidTwoFactorCodeMsg: '请输入6位验证码',
     cancel: '取消',
     saveSuccessMsg: '保存成功',
+    saveFailedMsg: '保存失败',
     delSuccessMsg: '删除成功',
     analytics: '分析页',
     allUsers: '用户列表',

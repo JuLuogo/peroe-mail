@@ -43,9 +43,9 @@
 
     <!-- 转发规则配置 -->
     <div class="forward-rules-section">
-      <div class="title">{{ $t('forwardRules') || 'Forward Rules' }}</div>
+      <div class="title">{{ $t('forwardRules') }}</div>
       <div class="item">
-        <div>{{ $t('enable') || 'Enable' }}</div>
+        <div>{{ $t('enable') }}</div>
         <div>
           <el-switch v-model="forwardEnabled" @change="toggleForward" />
         </div>
@@ -60,12 +60,12 @@
               :inactive-value="0"
               @change="toggleRule(rule)"
             />
-            <el-button size="small" @click="editRule(rule)">{{ $t('edit') || 'Edit' }}</el-button>
-            <el-button size="small" type="danger" @click="deleteRule(rule)">{{ $t('delete') || 'Delete' }}</el-button>
+            <el-button size="small" @click="editRule(rule)">{{ $t('edit') }}</el-button>
+            <el-button size="small" type="danger" @click="deleteRule(rule)">{{ $t('delete') }}</el-button>
           </span>
         </div>
         <el-button type="primary" @click="openAddRule" style="margin-top: 10px">
-          {{ $t('add') || 'Add' }}
+          {{ $t('add') }}
         </el-button>
       </div>
     </div>
@@ -110,22 +110,22 @@
     <div v-if="ruleDialogVisible" class="my-dialog-overlay" @click.self="ruleDialogVisible = false">
       <div class="my-dialog">
         <div class="my-dialog-header">
-          <span>{{ isEditRule ? 'Edit Rule' : 'Add Rule' }}</span>
+          <span>{{ isEditRule ? $t('editRule') : $t('addRule') }}</span>
           <span @click="ruleDialogVisible = false" style="cursor:pointer;">X</span>
         </div>
         <div class="my-dialog-body">
           <div style="margin-bottom:15px;">
-            <div style="margin-bottom:5px;">Pattern</div>
-            <input type="text" v-model="rulePattern" placeholder="e.g. *-99@99.com" style="width:100%;padding:8px;" />
+            <div style="margin-bottom:5px;">{{ $t('pattern') }}</div>
+            <input type="text" v-model="rulePattern" :placeholder="$t('patternPlaceholder')" style="width:100%;padding:8px;" />
           </div>
           <div>
-            <div style="margin-bottom:5px;">Forward To</div>
-            <input type="text" v-model="ruleForwardTo" placeholder="e.g. a@juluo.work" style="width:100%;padding:8px;" />
+            <div style="margin-bottom:5px;">{{ $t('forwardTo') }}</div>
+            <input type="text" v-model="ruleForwardTo" :placeholder="$t('forwardToPlaceholder')" style="width:100%;padding:8px;" />
           </div>
         </div>
         <div class="my-dialog-footer">
-          <button @click="ruleDialogVisible = false" style="padding:8px 16px;">Cancel</button>
-          <button @click="handleSaveRule" style="padding:8px 16px;background:#409eff;color:#fff;border:none;">Save</button>
+          <button @click="ruleDialogVisible = false" style="padding:8px 16px;">{{ $t('cancel') }}</button>
+          <button @click="handleSaveRule" style="padding:8px 16px;background:#409eff;color:#fff;border:none;">{{ $t('save') }}</button>
         </div>
       </div>
     </div>
@@ -412,16 +412,16 @@ function editRule(rule) {
 
 async function handleSaveRule() {
   if (!rulePattern.value || !ruleForwardTo.value) {
-    ElMessage.warning('Please fill in all required fields')
+    ElMessage.warning(t('pleaseFillRequiredFields'))
     return
   }
   if (!rulePattern.value.includes('@') || !rulePattern.value.includes('*')) {
-    ElMessage.warning('Pattern must contain wildcard * and @')
+    ElMessage.warning(t('patternMustContainWildcard'))
     return
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(ruleForwardTo.value)) {
-    ElMessage.warning('Invalid forward email format')
+    ElMessage.warning(t('forwardToEmailInvalid'))
     return
   }
   ruleLoading.value = true
@@ -437,11 +437,11 @@ async function handleSaveRule() {
       await forwardRuleAdd(data)
     }
     ruleDialogVisible.value = false
-    ElMessage.success('Save success')
+    ElMessage.success(t('saveSuccessMsg'))
     loadForwardRules()
   } catch (e) {
     console.error('Failed to save forward rule:', e)
-    ElMessage.error(e?.message || 'Save failed')
+    ElMessage.error(e?.message || t('saveFailedMsg'))
   } finally {
     ruleLoading.value = false
   }
@@ -476,7 +476,7 @@ async function toggleForward(val) {
     ElMessage.success(t('saveSuccessMsg'))
   } catch (e) {
     console.error('Failed to toggle forward:', e)
-    ElMessage.error(e?.message || t('saveFailedMsg') || '操作失败')
+    ElMessage.error(e?.message || t('saveFailedMsg'))
     // 刷新用户信息以恢复正确状态
     userStore.refreshUserInfo()
   }
