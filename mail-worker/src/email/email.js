@@ -169,9 +169,39 @@ export async function email(message, env, ctx) {
 		if (forwardRule) {
 			try {
 				console.log(`Catch-all 匹配: ${message.to} -> ${forwardRule.forwardTo}`);
-				await message.forward(forwardRule.forwardTo.trim());
+				const forwardTo = forwardRule.forwardTo.trim();
+				console.log(`[Catch-all] 开始转发到: ${forwardTo}`);
+				await message.forward(forwardTo);
+				console.log(`[Catch-all] 转发成功`);
+				// 保存成功日志到 KV
+				try {
+					const kvKey = `forward_success_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+					await env.kv.put(kvKey, JSON.stringify({
+						time: new Date().toISOString(),
+						from: message.to,
+						to: forwardTo,
+						rule: forwardRule,
+						status: 'success'
+					}), { expirationTtl: 300 });
+				} catch (kvErr) {
+					console.error(`[Catch-all] KV日志保存失败: ${kvErr}`);
+				}
 			} catch (e) {
-				console.error(`Catch-all 转发失败: ${e}`);
+				console.error(`[Catch-all] 转发失败: ${e}`);
+				// 保存失败日志到 KV
+				try {
+					const kvKey = `forward_error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+					await env.kv.put(kvKey, JSON.stringify({
+						time: new Date().toISOString(),
+						from: message.to,
+						to: forwardRule.forwardTo,
+						rule: forwardRule,
+						status: 'error',
+						error: String(e)
+					}), { expirationTtl: 300 });
+				} catch (kvErr) {
+					console.error(`[Catch-all] KV错误日志保存失败: ${kvErr}`);
+				}
 			}
 		}
 
