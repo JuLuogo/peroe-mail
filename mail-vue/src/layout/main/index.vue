@@ -94,7 +94,10 @@ const handleResize = () => {
   if (['content','email','send'].includes(route.meta.name)) {
     if (innerWidth !==  window.innerWidth) {
       innerWidth = window.innerWidth;
-      uiStore.accountShow = window.innerWidth >= 767;
+      // 桌面端保持显示，移动端才控制显示/隐藏
+      if (window.innerWidth >= 767) {
+        uiStore.accountShow = true;
+      }
     }
   }
 }
