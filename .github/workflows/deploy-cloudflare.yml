@@ -258,12 +258,8 @@ jobs:
           else
             echo "🔍 Queue not found, attempting to create..."
 
-            # 尝试创建队列，需要指定 account-id
-            if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-              CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" --account-id "$CLOUDFLARE_ACCOUNT_ID" 2>&1) || true
-            else
-              CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" 2>&1) || true
-            fi
+            # 尝试创建队列（wrangler 会自动使用已登录的账户信息）
+            CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" 2>&1) || true
 
             if echo "$CREATE_OUTPUT" | grep -qi "already exists"; then
               echo "✅ Queue $QUEUE_NAME already exists."
@@ -289,7 +285,7 @@ jobs:
         working-directory: ./mail-worker
         run: |
           echo "🚀 Starting deployment..."
-          pnpm wrangler deploy -c wrangler-action.toml 2>&1 \
+          pnpm wrangler deploy -c wrangler-action.toml --account-id $CLOUDFLARE_ACCOUNT_ID 2>&1 \
             | tee deploy.log \
             | grep -v "https://.*\.workers\.dev" \
             | sed -E 's/env\.domain .*/env.domain (***)/' \
