@@ -46,6 +46,7 @@ const en = {
     permissions: 'Role',
     inviteCode: 'Invite Code',
     SystemSettings: 'System Settings',
+    switchAccount: 'Switch Account',
     auditLog: 'Audit Log',
     actionType: 'Action Type',
     targetType: 'Target Type',

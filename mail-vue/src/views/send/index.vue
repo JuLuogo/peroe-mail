@@ -1,4 +1,9 @@
 <template>
+  <div class="send-page">
+    <div class="mobile-account-toggle" @click="toggleAccount">
+      <Icon icon="akar-icons:dot-grid-fill" width="16" height="16"/>
+      <span>{{ $t('switchAccount') }}</span>
+    </div>
   <emailScroll ref="sendScroll"
                :cancel-success="cancelStar"
                :star-success="addStar"
@@ -19,11 +24,13 @@
             width="28" height="28"/>
     </template>
   </emailScroll>
+  </div>
 </template>
 
 <script setup>
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
+import {useUiStore} from "@/store/ui.js";
 import emailScroll from "@/components/email-scroll/index.vue"
 import {emailList, emailDelete} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
@@ -37,6 +44,7 @@ defineOptions({
 
 const emailStore = useEmailStore();
 const accountStore = useAccountStore();
+const uiStore = useUiStore();
 const sendScroll = ref({})
 const params = reactive({
   timeSort: 0,
@@ -49,6 +57,10 @@ onMounted(() => {
 watch(() => accountStore.currentAccountId, () => {
   sendScroll.value.refreshList();
 })
+
+function toggleAccount() {
+  uiStore.accountShow = !uiStore.accountShow;
+}
 
 function changeTimeSort() {
   params.timeSort = params.timeSort ? 0 : 1
@@ -86,5 +98,21 @@ function getEmailList(emailId, size) {
 <style scoped>
 .icon {
   cursor: pointer;
+}
+.mobile-account-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
+  cursor: pointer;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+}
+@media (max-width: 767px) {
+  .mobile-account-toggle {
+    display: flex;
+  }
 }
 </style>

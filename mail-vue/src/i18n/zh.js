@@ -46,6 +46,7 @@ const zh = {
     permissions: '权限控制',
     inviteCode: '注册密钥',
     SystemSettings: '系统设置',
+    switchAccount: '切换邮箱',
     auditLog: '审计日志',
     actionType: '操作类型',
     targetType: '目标类型',
