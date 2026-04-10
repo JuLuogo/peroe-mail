@@ -52,7 +52,7 @@ local_ses_api_key = "${LOCAL_SES_API_KEY}"
 queue_enabled = "${QUEUE_ENABLED}"
 
 # Cloudflare Queue 绑定
-[[queues]]
+[[queue_producers]]
 binding = "EMAIL_QUEUE"
 queue = "${QUEUE_NAME:-email-queue}"
 
