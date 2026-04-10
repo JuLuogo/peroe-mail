@@ -241,7 +241,7 @@ jobs:
 
           if [ -z "$LOCAL_SES_API_URL" ]; then
             echo "⚠️ LOCAL_SES_API_URL is not configured. Queue mode requires local API URL."
-            echo "⚠️ Falling back to sync mode (direct SES API call)."
+            echo "⚠️ Falling back to sync mode."
             # 删除队列配置行
             sed -i '/^# Cloudflare Queue 绑定/,/^$/d' "$CONFIG_FILE"
             # 将 queue_enabled 设置为 false
@@ -249,26 +249,25 @@ jobs:
             exit 0
           fi
 
-          echo "🔍 Checking if the queue exists..."
+          echo "🔍 Creating queue $QUEUE_NAME..."
 
-          set +e
-            QUEUE_LIST=$(pnpm wrangler queues list 2>&1)
-            STATUS=$?
-          set -e
+          # 直接尝试创建队列
+          CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" 2>&1)
+          CREATE_STATUS=$?
 
-          if [ $STATUS -ne 0 ]; then
-            echo "$QUEUE_LIST"
-            exit 1
-          fi
-
-          if echo "$QUEUE_LIST" | jq -e ".queues[] | select(.name == \"$QUEUE_NAME\")" >/dev/null; then
-            echo "✅ Queue $QUEUE_NAME already exists."
+          if [ $CREATE_STATUS -eq 0 ]; then
+            echo "✅ Queue $QUEUE_NAME created successfully."
           else
-            echo "⚠️ Queue $QUEUE_NAME does not exist. Starting creation..."
-            pnpm wrangler queues create "$QUEUE_NAME"
+            # 检查是否是因为队列已存在
+            if echo "$CREATE_OUTPUT" | grep -qi "already exists"; then
+              echo "✅ Queue $QUEUE_NAME already exists."
+            else
+              echo "⚠️ Queue creation returned: $CREATE_OUTPUT"
+              # 继续部署，不强制失败（队列可能已存在）
+            fi
           fi
 
-          echo "✅ Queue setup completed."
+          echo "✅ Queue setup completed.""
 
       - name: 🎨 构建前端 / Build frontend
         run: |

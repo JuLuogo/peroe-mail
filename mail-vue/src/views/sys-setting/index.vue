@@ -782,13 +782,6 @@
       <el-dialog v-model="sesFormShow" :title="$t('sesConfig')" width="400" @closed="cleanSesForm">
         <form>
           <div class="ses-form-section">
-            <div class="ses-form-title">{{ $t('sesDirectConfig') }}</div>
-            <el-input class="dialog-input" type="text" placeholder="SES Access Key" v-model="sesForm.sesAccessKey"/>
-            <el-input class="dialog-input" type="text" placeholder="SES Secret Key" v-model="sesForm.sesSecretKey"/>
-            <el-input class="dialog-input" type="text" placeholder="SES Region (e.g. ap-northeast-1)" v-model="sesForm.sesRegion"/>
-          </div>
-          <el-divider/>
-          <div class="ses-form-section">
             <div class="ses-form-title">{{ $t('localSesApiConfig') }}</div>
             <el-input class="dialog-input" type="text" placeholder="Local SES API URL (e.g. https://xxx.trycloudflare.com)" v-model="sesForm.localSesApiUrl"/>
             <el-input class="dialog-input" type="text" placeholder="Local SES API Key" v-model="sesForm.localSesApiKey"/>
@@ -1403,29 +1396,20 @@ function cleanResendTokenForm() {
 
 function cleanSesForm() {
   // 清空表单值
-  sesForm.sesAccessKey = ''
-  sesForm.sesSecretKey = ''
-  sesForm.sesRegion = ''
   sesForm.localSesApiUrl = ''
   sesForm.localSesApiKey = ''
 }
 
 function openSesForm() {
   // 初始化表单值
-  sesForm.sesAccessKey = setting.value.sesAccessKey || ''
-  sesForm.sesSecretKey = setting.value.sesSecretKey || ''
-  sesForm.sesRegion = setting.value.sesRegion || ''
   sesForm.localSesApiUrl = setting.value.localSesApiUrl || ''
   sesForm.localSesApiKey = setting.value.localSesApiKey || ''
   sesFormShow.value = true
 }
 
 function saveSesConfig() {
-  // 表单验证：至少需要一种配置方式
-  const hasDirectSes = sesForm.sesAccessKey && sesForm.sesSecretKey && sesForm.sesRegion
-  const hasLocalApi = sesForm.localSesApiUrl
-
-  if (!hasDirectSes && !hasLocalApi) {
+  // 表单验证：本地 API URL 不能为空
+  if (!sesForm.localSesApiUrl) {
     ElMessage({
       message: t('emptySesConfig'),
       type: 'error',
@@ -1435,9 +1419,6 @@ function saveSesConfig() {
   }
 
   const settingForm = {
-    sesAccessKey: sesForm.sesAccessKey,
-    sesSecretKey: sesForm.sesSecretKey,
-    sesRegion: sesForm.sesRegion,
     localSesApiUrl: sesForm.localSesApiUrl,
     localSesApiKey: sesForm.localSesApiKey,
   }
