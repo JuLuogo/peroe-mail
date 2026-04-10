@@ -251,23 +251,37 @@ jobs:
 
           echo "🔍 Creating queue $QUEUE_NAME..."
 
-          # 直接尝试创建队列
-          CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" 2>&1)
-          CREATE_STATUS=$?
+          # 检查队列是否已存在
+          set +e
+          LIST_OUTPUT=$(pnpm wrangler queues list 2>&1)
+          LIST_STATUS=$?
+          set -e
 
-          if [ $CREATE_STATUS -eq 0 ]; then
-            echo "✅ Queue $QUEUE_NAME created successfully."
+          if [ $LIST_STATUS -eq 0 ] && echo "$LIST_OUTPUT" | grep -qi "$QUEUE_NAME"; then
+            echo "✅ Queue $QUEUE_NAME already exists."
           else
-            # 检查是否是因为队列已存在
-            if echo "$CREATE_OUTPUT" | grep -qi "already exists"; then
-              echo "✅ Queue $QUEUE_NAME already exists."
+            # 尝试创建队列，需要指定 account-id
+            if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+              CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" --account-id "$CLOUDFLARE_ACCOUNT_ID" 2>&1)
             else
-              echo "⚠️ Queue creation returned: $CREATE_OUTPUT"
-              # 继续部署，不强制失败（队列可能已存在）
+              CREATE_OUTPUT=$(pnpm wrangler queues create "$QUEUE_NAME" 2>&1)
+            fi
+            CREATE_STATUS=$?
+
+            if [ $CREATE_STATUS -eq 0 ]; then
+              echo "✅ Queue $QUEUE_NAME created successfully."
+            else
+              # 检查是否是因为队列已存在
+              if echo "$CREATE_OUTPUT" | grep -qi "already exists"; then
+                echo "✅ Queue $QUEUE_NAME already exists."
+              else
+                echo "⚠️ Queue creation returned: $CREATE_OUTPUT"
+                echo "⚠️ Continuing deployment anyway..."
+              fi
             fi
           fi
 
-          echo "✅ Queue setup completed.""
+          echo "✅ Queue setup completed."
 
       - name: 🎨 构建前端 / Build frontend
         run: |
