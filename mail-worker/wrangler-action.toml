@@ -49,6 +49,7 @@ ses_secret_key = "${SES_SECRET_KEY}"
 ses_region = "${SES_REGION}"
 local_ses_api_url = "${LOCAL_SES_API_URL}"
 local_ses_api_key = "${LOCAL_SES_API_KEY}"
+queue_enabled = "${QUEUE_ENABLED}"
 
 # Cloudflare Queue 绑定
 [queues]
