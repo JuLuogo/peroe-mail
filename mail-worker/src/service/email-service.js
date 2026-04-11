@@ -556,7 +556,9 @@ const emailService = {
 
 		const images = Array.from(document.querySelectorAll('img'));
 
-		const useAtts = []
+		const useAtts = [];
+
+		r2domain = domainUtils.toOssDomain(r2domain);
 
 		for (const img of images) {
 
@@ -573,8 +575,6 @@ const emailService = {
 				}
 
 			}
-
-			r2domain = domainUtils.toOssDomain(r2domain)
 
 			if (src && src.startsWith(r2domain + '/')) {
 				img.setAttribute('src', src.replace(r2domain + '/', '{{domain}}'));
@@ -753,9 +753,9 @@ const emailService = {
 			query.orderBy(desc(email.emailId));
 		}
 
-		const listQuery = await query.limit(size).all();
-		const totalQuery = await queryCount.get();
-		const latestEmailQuery = await orm(c).select().from(email)
+		const listQuery = query.limit(size).all();
+		const totalQuery = queryCount.get();
+		const latestEmailQuery = orm(c).select().from(email)
 			.where(and(
 				eq(email.type, emailConst.type.RECEIVE),
 				ne(email.status, emailConst.status.SAVING)
@@ -881,7 +881,7 @@ const emailService = {
 
 	async read(c, params, userId) {
 		const { emailIds } = params;
-		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds))).run();
 	},
 
 	async archive(c, params, userId) {

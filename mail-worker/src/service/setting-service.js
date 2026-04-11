@@ -63,8 +63,6 @@ const settingService = {
 			linuxdoSwitch = false
 		}
 
-		console.log(projectLink)
-
 		if (typeof projectLink === 'string' && projectLink === 'false') {
 			projectLink = false
 		} else if (projectLink === false) {
