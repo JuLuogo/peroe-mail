@@ -183,7 +183,7 @@ const emailService = {
 			attachments //附件
 		} = params;
 
-		const { resendTokens, r2Domain, send, domainList, sesEnabled, sesAccessKey, sesSecretKey, sesRegion, sesTokens, sendMethodConfig } = await settingService.query(c);
+		const { resendTokens, r2Domain, send, domainList, sesEnabled, sesAccessKey, sesSecretKey, sesRegion, sesTokens, sendMethodConfig, queueEnabled, localSesApiUrl } = await settingService.query(c);
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
@@ -340,8 +340,6 @@ const emailService = {
 				}
 
 				// 检查是否启用队列模式
-				const { queueEnabled, localSesApiUrl } = await settingService.query(c);
-
 				if (queueEnabled && localSesApiUrl) {
 					// 异步模式：放入队列立即返回
 					sendResult = await queueService.enqueueEmail(c, sendForm);
@@ -955,7 +953,7 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
-		const [total] = await Promise.all([totalQuery]);
+		const total = await totalQuery;
 
 		// 获取最新归档邮件
 		const latestArchiveQuery = orm(c).select().from(email)
@@ -1038,7 +1036,7 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
-		const [total] = await Promise.all([totalQuery]);
+		const total = await totalQuery;
 
 		return { list, total: total.total };
 	}
