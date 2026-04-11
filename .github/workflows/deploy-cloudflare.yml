@@ -115,11 +115,19 @@ jobs:
           fi
           
           if [ -z "$LINUXDO_CLIENT_ID" ] || [ -z "$LINUXDO_CLIENT_SECRET" ]; then
-            sed -i '/^linuxdo_client_id = /,/^linuxdo_switch = /d' "$CONFIG_FILE"
+            sed -i '/^linuxdo_client_id = /d' "$CONFIG_FILE"
+            sed -i '/^linuxdo_client_secret = /d' "$CONFIG_FILE"
+            sed -i '/^linuxdo_callback_url = /d' "$CONFIG_FILE"
+            sed -i '/^linuxdo_switch = /d' "$CONFIG_FILE"
           fi
 
           if [ -z "$SES_ACCESS_KEY" ] || [ -z "$SES_SECRET_KEY" ]; then
-            sed -i '/^ses_access_key = /,/^ses_enabled = /d' "$CONFIG_FILE"
+            sed -i '/^ses_access_key = /d' "$CONFIG_FILE"
+            sed -i '/^ses_secret_key = /d' "$CONFIG_FILE"
+            sed -i '/^ses_region = /d' "$CONFIG_FILE"
+            sed -i '/^ses_enabled = /d' "$CONFIG_FILE"
+            sed -i '/^local_ses_api_url = /d' "$CONFIG_FILE"
+            sed -i '/^local_ses_api_key = /d' "$CONFIG_FILE"
           fi
           
           if [ -z "$CUSTOM_DOMAIN" ]; then
