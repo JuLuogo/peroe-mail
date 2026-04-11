@@ -211,27 +211,79 @@ app.post('/send-raw-email', validateApiKey, async (_req, res) => {
   const requestId = crypto.randomUUID().slice(0, 8);
 
   try {
-    const { from, to, rawMessage } = _req.body;
+    const { from, to, rawMessage, attachments, subject, text, html } = _req.body;
 
     console.log(`[${requestId}] Received raw email request:`, {
       from,
       to,
-      hasRawMessage: !!rawMessage
+      hasRawMessage: !!rawMessage,
+      hasAttachments: !!attachments,
+      attachmentsCount: attachments?.length || 0
     });
 
     // 验证必需参数
-    if (!from || !to || !rawMessage) {
+    if (!from || !to) {
       console.warn(`[${requestId}] Missing required parameters`);
       return res.status(400).json({
         success: false,
-        error: 'Missing required parameters: from, to, rawMessage'
+        error: 'Missing required parameters: from, to'
       });
     }
 
-    // rawMessage 是 base64 编码的
-    const rawBuffer = Buffer.from(rawMessage, 'base64');
+    let rawBuffer;
 
-    console.log(`[${requestId}] Sending raw email with attachments...`);
+    // URL 传输模式：通过 URL 下载附件并构建 MIME 邮件
+    if (attachments && attachments.length > 0) {
+      console.log(`[${requestId}] Using URL mode: downloading ${attachments.length} attachments...`);
+
+      // 下载所有附件
+      const downloadedAttachments = [];
+      for (const att of attachments) {
+        try {
+          console.log(`[${requestId}] Downloading: ${att.url}`);
+          const response = await fetch(att.url);
+          if (!response.ok) {
+            throw new Error(`Failed to download ${att.url}: ${response.status} ${response.statusText}`);
+          }
+          const buffer = await response.arrayBuffer();
+          downloadedAttachments.push({
+            filename: att.filename,
+            contentType: att.contentType,
+            contentId: att.contentId,
+            content: Buffer.from(buffer)
+          });
+          console.log(`[${requestId}] Downloaded: ${att.filename}, size: ${buffer.byteLength}`);
+        } catch (downloadError) {
+          console.error(`[${requestId}] Failed to download attachment:`, downloadError);
+          return res.status(500).json({
+            success: false,
+            error: `Failed to download attachment: ${downloadError.message}`
+          });
+        }
+      }
+
+      // 构建 MIME 邮件
+      rawBuffer = buildMimeEmail({
+        from,
+        to,
+        subject: subject || '(No Subject)',
+        text,
+        html,
+        attachments: downloadedAttachments
+      });
+      console.log(`[${requestId}] MIME email built, size: ${rawBuffer.length}`);
+    } else if (rawMessage) {
+      // 原有模式：rawMessage 是 base64 编码的
+      rawBuffer = Buffer.from(rawMessage, 'base64');
+    } else {
+      console.warn(`[${requestId}] Missing rawMessage or attachments`);
+      return res.status(400).json({
+        success: false,
+        error: 'Missing rawMessage or attachments'
+      });
+    }
+
+    console.log(`[${requestId}] Sending raw email...`);
 
     const params = {
       RawMessage: {
@@ -257,6 +309,79 @@ app.post('/send-raw-email', validateApiKey, async (_req, res) => {
     });
   }
 });
+
+/**
+ * 构建 MIME 格式的邮件
+ */
+function buildMimeEmail({ from, to, subject, text, html, attachments }) {
+  const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const toAddresses = Array.isArray(to) ? to.join(', ') : to;
+
+  const parts = [];
+
+  // 邮件头
+  parts.push(`From: ${from}`);
+  parts.push(`To: ${toAddresses}`);
+  parts.push(`Subject: =?UTF-8?B?${Buffer.from(subject || '').toString('base64')}?=`);
+  parts.push(`MIME-Version: 1.0`);
+  parts.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+  parts.push('');
+
+  // multipart/alternative 部分
+  const altBoundary = `----=_AltPart_${Date.now()}`;
+  parts.push(`--${boundary}`);
+  parts.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+  parts.push('');
+
+  if (text || html) {
+    if (text) {
+      parts.push(`--${altBoundary}`);
+      parts.push(`Content-Type: text/plain; charset=UTF-8`);
+      parts.push(`Content-Transfer-Encoding: 8bit`);
+      parts.push('');
+      parts.push(text);
+    }
+    if (html) {
+      parts.push(`--${altBoundary}`);
+      parts.push(`Content-Type: text/html; charset=UTF-8`);
+      parts.push(`Content-Transfer-Encoding: 8bit`);
+      parts.push('');
+      parts.push(html);
+    }
+  }
+
+  parts.push(`--${altBoundary}--`);
+  parts.push('');
+
+  // 附件部分
+  if (attachments && attachments.length > 0) {
+    for (const att of attachments) {
+      const filename = att.filename || 'attachment';
+      const contentType = att.contentType || 'application/octet-stream';
+      const content = att.content;
+
+      parts.push(`--${boundary}`);
+      parts.push(`Content-Type: ${contentType}; name="${filename}"`);
+      parts.push(`Content-Transfer-Encoding: base64`);
+      parts.push(`Content-Disposition: attachment; filename="${filename}"`);
+      if (att.contentId) {
+        parts.push(`Content-ID: <${att.contentId}>`);
+      }
+      parts.push('');
+
+      // 将内容转换为 base64，每行76字符
+      const base64Content = content.toString('base64');
+      const formattedBase64 = base64Content.match(/.{1,76}/g)?.join('\r\n') || base64Content;
+      parts.push(formattedBase64);
+      parts.push('');
+    }
+  }
+
+  // 结束标记
+  parts.push(`--${boundary}--`);
+
+  return Buffer.from(parts.join('\r\n'), 'utf-8');
+}
 
 // 健康检查（无需认证）
 app.get('/health', (req, res) => {

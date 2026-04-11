@@ -8,6 +8,7 @@
  */
 
 import r2Service from './r2-service';
+import settingService from './setting-service';
 
 const queueService = {
     /**
@@ -99,9 +100,10 @@ const queueService = {
      * 上传附件到 R2
      * @param {Object} c - Hono context
      * @param {Array} attachments - 附件数组
-     * @returns {Promise<Array>} 带 R2 键的附件数组（不含实际内容）
+     * @param {string} r2Domain - R2 域名
+     * @returns {Promise<Array>} 带 R2 URL 的附件数组（不含实际内容）
      */
-    async uploadAttachmentsToR2(c, attachments) {
+    async uploadAttachmentsToR2(c, attachments, r2Domain) {
         if (!attachments || attachments.length === 0) {
             return [];
         }
@@ -132,16 +134,17 @@ const queueService = {
 
                 uploadedKeys.push(r2Key);
 
-                // 构建只含元数据的附件对象
+                // 构建只含 URL 的附件对象（不发实际内容，只发 URL）
+                const r2Url = `https://${r2Domain}/${r2Key}`;
                 r2Attachments.push({
                     filename: this.sanitizeFilename(att.filename),
                     contentType: att.contentType,
                     contentId: att.contentId,
-                    r2Key: r2Key,
+                    url: r2Url,
                     size: content.length || content.byteLength,
                 });
 
-                console.log(`[Queue] Uploaded attachment to R2: ${r2Key}`);
+                console.log(`[Queue] Uploaded attachment to R2: ${r2Key}, URL: ${r2Url}`);
             }
 
             return r2Attachments;
@@ -236,6 +239,9 @@ const queueService = {
     async enqueueEmail(c, params) {
         const { from, to, subject, text, html, headers, attachments } = params;
 
+        // 获取 R2 域名
+        const { r2Domain } = await settingService.query(c);
+
         // 邮件数据
         const emailData = {
             from,
@@ -248,11 +254,11 @@ const queueService = {
         if (html) emailData.html = html;
         if (headers) emailData.headers = headers;
 
-        // 如果有附件，先上传到 R2，队列消息只保存 R2 键
+        // 如果有附件，先上传到 R2，队列消息只保存 R2 URL
         if (attachments && attachments.length > 0) {
             console.log(`[Queue] Uploading ${attachments.length} attachments to R2...`);
-            emailData.attachments = await this.uploadAttachmentsToR2(c, attachments);
-            console.log(`[Queue] Attachments uploaded, queue message will contain R2 keys only`);
+            emailData.attachments = await this.uploadAttachmentsToR2(c, attachments, r2Domain);
+            console.log(`[Queue] Attachments uploaded, queue message will contain R2 URLs only`);
         }
 
         try {
@@ -293,37 +299,6 @@ const queueService = {
         console.log(`[Queue] Email details - From: ${from}, To: ${JSON.stringify(to)}, Subject: ${subject}`);
         console.log(`[Queue] Has text: !!text, Has html: !!html, Has headers: !!headers, Attachments count: ${attachments?.length || 0}`);
 
-        // 构建请求参数
-        const requestBody = {
-            from,
-            to,
-            subject,
-        };
-
-        if (text) requestBody.text = text;
-        if (html) requestBody.html = html;
-        if (headers) {
-            if (headers['reply-to']) requestBody.replyTo = headers['reply-to'];
-            if (headers['in-reply-to']) requestBody.inReplyTo = headers['in-reply-to'];
-            if (headers['references']) requestBody.references = headers['references'];
-        }
-
-        // 如果有附件，从 R2 下载
-        if (attachments && attachments.length > 0) {
-            console.log(`[Queue] Downloading ${attachments.length} attachments from R2...`);
-            console.log(`[Queue] Attachment keys:`, attachments.map(a => a.r2Key));
-            try {
-                requestBody.attachments = await this.downloadAttachmentsFromR2(env, attachments);
-                console.log(`[Queue] Attachments downloaded successfully, sizes:`, requestBody.attachments.map(a => a.content?.length || a.content?.byteLength || 0));
-            } catch (error) {
-                console.error('[Queue] Failed to download attachments from R2:', error);
-                return {
-                    success: false,
-                    error: `Failed to download attachments: ${error.message}`,
-                };
-            }
-        }
-
         try {
             const localApiUrl = env.LOCAL_SES_API_URL;
             const apiKey = env.LOCAL_SES_API_KEY;
@@ -335,37 +310,48 @@ const queueService = {
             }
 
             // 根据是否有附件选择不同的 API 端点
-            const endpoint = requestBody.attachments ? '/send-raw-email' : '/send-email';
+            const hasAttachments = attachments && attachments.length > 0;
+            const endpoint = hasAttachments ? '/send-raw-email' : '/send-email';
             console.log(`[Queue] Using endpoint: ${endpoint}`);
 
-            // 如果有附件，需要构建 raw MIME 邮件
+            // 构建请求参数
+            const requestBody = {
+                from,
+                to,
+                subject,
+            };
+
+            if (text) requestBody.text = text;
+            if (html) requestBody.html = html;
+            if (headers) {
+                if (headers['reply-to']) requestBody.replyTo = headers['reply-to'];
+                if (headers['in-reply-to']) requestBody.inReplyTo = headers['in-reply-to'];
+                if (headers['references']) requestBody.references = headers['references'];
+            }
+
             let response;
-            if (requestBody.attachments) {
-                console.log(`[Queue] Building raw email with ${requestBody.attachments.length} attachment(s)...`);
-                try {
-                    const rawMessage = await this.buildRawEmail(requestBody);
-                    console.log(`[Queue] Raw message size: ${(rawMessage.length / 1024).toFixed(2)} KB`);
+            if (hasAttachments) {
+                // URL 传输模式：只传附件 URL，让后端自己下载
+                // 附件格式: { filename, contentType, contentId, url, size }
+                requestBody.attachments = attachments.map(att => ({
+                    filename: att.filename,
+                    contentType: att.contentType,
+                    contentId: att.contentId,
+                    url: att.url,
+                }));
+                console.log(`[Queue] Using URL mode, attachment URLs:`, requestBody.attachments.map(a => a.url));
 
-                    const payload = {
-                        from: requestBody.from,
-                        to: requestBody.to,
-                        rawMessage: rawMessage,
-                    };
-                    console.log(`[Queue] Sending request to: ${localApiUrl}${endpoint}`);
-                    console.log(`[Queue] Payload size: ${(JSON.stringify(payload).length / 1024).toFixed(2)} KB`);
+                console.log(`[Queue] Sending request to: ${localApiUrl}${endpoint}`);
+                console.log(`[Queue] Payload size: ${(JSON.stringify(requestBody).length / 1024).toFixed(2)} KB`);
 
-                    response = await fetch(`${localApiUrl}${endpoint}`, {
-                        method: 'POST',
-                        headers: {
-                            'content-type': 'application/json',
-                            ...(apiKey && { 'x-api-key': apiKey }),
-                        },
-                        body: JSON.stringify(payload),
-                    });
-                } catch (buildError) {
-                    console.error(`[Queue] Failed to build or send raw email:`, buildError);
-                    throw buildError;
-                }
+                response = await fetch(`${localApiUrl}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        ...(apiKey && { 'x-api-key': apiKey }),
+                    },
+                    body: JSON.stringify(requestBody),
+                });
             } else {
                 console.log(`[Queue] Sending standard email request...`);
                 response = await fetch(`${localApiUrl}${endpoint}`, {
@@ -401,7 +387,7 @@ const queueService = {
             console.log(`[Queue] ✅ Email sent successfully! MessageId: ${parsed.messageId}`);
 
             // 发送成功后清理 R2 中的临时附件
-            if (attachments && attachments.length > 0) {
+            if (hasAttachments) {
                 await this.cleanupR2Attachments(env, attachments);
             }
 
