@@ -2,16 +2,42 @@ import settingService from './setting-service.js';
 
 const sesService = {
     /**
-     * 将 Uint8Array/ArrayBuffer 安全地编码为 base64（避免栈溢出）
+     * 将 Uint8Array/ArrayBuffer 高效编码为 base64（避免栈溢出和 CPU 超限）
+     * 使用分块处理，每次处理 8192 字节，减少 CPU 连续执行时间
+     */
+    async uint8ArrayToBase64Async(data) {
+        const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+        const chunkSize = 8192;
+        const len = bytes.length;
+        const chunks = [];
+
+        for (let i = 0; i < len; i += chunkSize) {
+            const chunk = bytes.slice(i, Math.min(i + chunkSize, len));
+            // 使用 apply 避免栈溢出，每个 chunk 最多 8192 个字节
+            chunks.push(String.fromCharCode.apply(null, chunk));
+            // 让出 CPU，防止超时（虽然是同步操作，但分块减少了连续计算量）
+            await Promise.resolve();
+        }
+
+        return btoa(chunks.join(''));
+    },
+
+    /**
+     * 将 Uint8Array/ArrayBuffer 同步高效编码为 base64
+     * 使用预分配 Uint8Array 方式，避免字符串拼接开销
      */
     uint8ArrayToBase64(data) {
         const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
-        let binary = '';
-        const len = bytes.byteLength;
+        const len = bytes.length;
+
+        // 预分配字符数组（每个字节对应一个字符）
+        const chars = new Array(len);
         for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
+            chars[i] = String.fromCharCode(bytes[i]);
         }
-        return btoa(binary);
+
+        // 一次性 join 比逐个 += 高效得多
+        return btoa(chars.join(''));
     },
 
     /**
@@ -249,7 +275,8 @@ const sesService = {
 
             // 构建 MIME 邮件
             const rawEmail = this.buildMimeEmail(params);
-            const rawEmailBase64 = this.uint8ArrayToBase64(rawEmail);
+            // 使用异步分块编码，避免 CPU 超时
+            const rawEmailBase64 = await this.uint8ArrayToBase64Async(rawEmail);
 
             console.log('[SES] MIME email built, size:', rawEmail.length, 'bytes, base64 size:', rawEmailBase64.length);
 
