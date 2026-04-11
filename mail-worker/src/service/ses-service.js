@@ -111,8 +111,8 @@ const sesService = {
             references = headers['references'] || null;
         }
 
-        // 构建邮件头
-        const subjectEncoded = Buffer.from(subject).toString('base64');
+        // 构建邮件头（使用 btoa + encodeURIComponent 替代 Buffer）
+        const subjectEncoded = btoa(unescape(encodeURIComponent(subject)));
 
         const mimeHeaders = [
             `From: ${from}`,
@@ -215,7 +215,9 @@ const sesService = {
             ''
         ].join('\r\n');
 
-        return Buffer.from(mimeBody, 'utf-8');
+        // 将字符串转换为 Uint8Array（替代 Buffer.from）
+        const encoder = new TextEncoder();
+        return encoder.encode(mimeBody);
     },
 
     async sendEmail(c, params) {
@@ -246,7 +248,8 @@ const sesService = {
                     body: JSON.stringify({
                         from,
                         to: Array.isArray(to) ? to : [to],
-                        rawMessage: rawEmail.toString('base64')
+                        // 将 Uint8Array 转换为 base64
+                        rawMessage: btoa(String.fromCharCode(...rawEmail))
                     }),
                 });
 
