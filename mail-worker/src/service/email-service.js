@@ -393,22 +393,24 @@ const emailService = {
 			await userService.incrUserSendCount(c, receiveEmail.length, userId);
 		}
 
+		//检查附件数量限制（先检查再保存，避免数据不一致）
+		if (imageDataList.length > 10) {
+			throw new BizError(t('imageAttLimit'));
+		}
+		if (attachments?.length > 10) {
+			throw new BizError(t('attLimit'));
+		}
+
 		//保存到数据库并返回结果
 		const emailResult = await orm(c).insert(email).values(emailData).returning().get();
 
 		//保存内嵌附件
 		if (imageDataList.length > 0) {
-			if (imageDataList.length > 10) {
-				throw new BizError(t('imageAttLimit'));
-			}
 			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
 		}
 
 		//保存普通附件
 		if (attachments?.length > 0) {
-			if (attachments.length > 10) {
-				throw new BizError(t('attLimit'));
-			}
 			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
 		}
 
@@ -867,9 +869,9 @@ const emailService = {
 			return;
 		}
 
+		// 先删附件，再删邮件（在同一个事务中，避免竞态）
 		await attService.removeByEmailIds(c, emailIds);
-
-		await orm(c).delete(email).where(conditions.length > 1 ? and(...conditions) : conditions[0]).run();
+		await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
 	},
 
 	async physicsDeleteByAccountId(c, accountId) {
