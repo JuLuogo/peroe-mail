@@ -37,7 +37,15 @@ const s3Service = {
 		for await (const chunk of response.Body) {
 			chunks.push(chunk);
 		}
-		return Buffer.concat(chunks);
+		// 使用 Uint8Array 替代 Buffer.concat（Cloudflare Workers 环境）
+		const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+		const result = new Uint8Array(totalLength);
+		let offset = 0;
+		for (const chunk of chunks) {
+			result.set(chunk, offset);
+			offset += chunk.length;
+		}
+		return result;
 	},
 
 	async deleteObj(c, keys) {
