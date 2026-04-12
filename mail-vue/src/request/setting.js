@@ -20,12 +20,16 @@ export function deleteBackground() {
     return http.delete('/setting/deleteBackground')
 }
 
-export function cleanupTempFiles() {
-    return http.post('/setting/cleanupTempFiles')
+export function cleanupTempFiles(types) {
+    return http.post('/setting/cleanupTempFiles', { types })
 }
 
 export function tempFileStats() {
     return http.get('/setting/tempFileStats')
+}
+
+export function previewCleanup() {
+    return http.post('/setting/previewCleanup')
 }
 
 export function cleanupRules() {

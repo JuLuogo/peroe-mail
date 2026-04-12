@@ -959,13 +959,53 @@
           <el-button type="primary" :loading="tgChannelSaving" @click="saveTgChannel">{{ $t('save') }}</el-button>
         </template>
       </el-dialog>
+      <!-- Temp File Cleanup Preview Dialog -->
+      <el-dialog v-model="tempFilePreviewShow" :title="$t('tempFileCleanup')" width="600" top="5vh">
+        <div class="cleanup-options">
+          <el-checkbox-group v-model="selectedCleanupTypes">
+            <el-checkbox label="queue">{{ $t('cleanupQueueFiles') }} ({{ cleanupPreview?.queue?.count || 0 }})</el-checkbox>
+            <el-checkbox label="deletedEmail">{{ $t('cleanupDeletedEmailAtts') }} ({{ cleanupPreview?.deletedEmail?.count || 0 }})</el-checkbox>
+            <el-checkbox label="orphaned">{{ $t('cleanupOrphanedFiles') }} ({{ cleanupPreview?.orphaned?.count || 0 }})</el-checkbox>
+          </el-checkbox-group>
+        </div>
+        <div class="cleanup-preview" v-if="cleanupPreview">
+          <div v-if="selectedCleanupTypes.includes('queue') && cleanupPreview.queue?.files?.length > 0" class="cleanup-section">
+            <h4>{{ $t('queueFiles') }} - {{ formatSize(cleanupPreview.queue.size) }}</h4>
+            <ul class="cleanup-file-list">
+              <li v-for="file in cleanupPreview.queue.files" :key="file.key">
+                {{ file.key }} - {{ formatSize(file.size) }}
+              </li>
+            </ul>
+          </div>
+          <div v-if="selectedCleanupTypes.includes('deletedEmail') && cleanupPreview.deletedEmail?.emails?.length > 0" class="cleanup-section">
+            <h4>{{ $t('deletedEmailAtts') }} - {{ formatSize(cleanupPreview.deletedEmail.size) }}</h4>
+            <ul class="cleanup-file-list">
+              <li v-for="item in cleanupPreview.deletedEmail.emails" :key="item.emailId">
+                [{{ item.emailId }}] {{ item.subject || $t('noSubject') }}
+              </li>
+            </ul>
+          </div>
+          <div v-if="selectedCleanupTypes.includes('orphaned') && cleanupPreview.orphaned?.files?.length > 0" class="cleanup-section">
+            <h4>{{ $t('orphanedFiles') }} - {{ formatSize(cleanupPreview.orphaned.size) }}</h4>
+            <ul class="cleanup-file-list">
+              <li v-for="file in cleanupPreview.orphaned.files" :key="file.key">
+                {{ file.key }} - {{ formatSize(file.size) }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="tempFilePreviewShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="executeCleanup" :loading="tempFileCleanupLoading">{{ $t('cleanup') }}</el-button>
+        </template>
+      </el-dialog>
     </el-scrollbar>
   </div>
 </template>
 
 <script setup>
 import {computed, defineOptions, reactive, ref} from "vue";
-import {deleteBackground, setBackground, settingQuery, settingSet, cleanupTempFiles, tempFileStats, cleanupRules, ruleStats} from "@/request/setting.js";
+import {deleteBackground, setBackground, settingQuery, settingSet, cleanupTempFiles, tempFileStats, cleanupRules, ruleStats, previewCleanup} from "@/request/setting.js";
 import {getTgChannels, addTgChannel, updateTgChannel, deleteTgChannel, testTgChannel} from "@/request/tg-channel.js";
 import {useSettingStore} from "@/store/setting.js";
 import {useUiStore} from "@/store/ui.js";
@@ -1100,6 +1140,9 @@ const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px'
 const tempFileStatsData = ref({ count: 0, totalSize: 0 })
 const tempFileCleanupLoading = ref(false)
 const tempFileCleanDays = ref(7)
+const tempFilePreviewShow = ref(false)
+const cleanupPreview = ref(null)
+const selectedCleanupTypes = ref(['queue', 'deletedEmail', 'orphaned'])
 const ruleStatsData = ref({ totalExpired: 0, expiredFilterRules: 0, expiredForwardRules: 0 })
 const ruleCleanupLoading = ref(false)
 const ruleCleanDays = ref(30)
@@ -1176,28 +1219,41 @@ function formatSize(bytes) {
 }
 
 function openTempFileCleanup() {
-  ElMessageBox.confirm(t('tempFileCleanupConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    tempFileCleanupLoading.value = true
-    cleanupTempFiles().then(res => {
-      ElMessage({
-        message: t('tempFileCleanupSuccess', { count: res.data?.cleaned || 0 }),
-        type: 'success',
-        plain: true
-      })
-      loadTempFileStats()
-    }).catch(() => {
-      ElMessage({
-        message: t('tempFileCleanupFailed'),
-        type: 'error',
-        plain: true
-      })
-    }).finally(() => {
-      tempFileCleanupLoading.value = false
+  selectedCleanupTypes.value = ['queue', 'deletedEmail', 'orphaned']
+  tempFilePreviewShow.value = true
+  previewCleanup().then(res => {
+    cleanupPreview.value = res
+  }).catch(() => {
+    cleanupPreview.value = null
+  })
+}
+
+function executeCleanup() {
+  if (selectedCleanupTypes.value.length === 0) {
+    ElMessage({
+      message: t('selectCleanupType'),
+      type: 'warning',
+      plain: true
     })
+    return
+  }
+  tempFilePreviewShow.value = false
+  tempFileCleanupLoading.value = true
+  cleanupTempFiles(selectedCleanupTypes.value).then(res => {
+    ElMessage({
+      message: t('tempFileCleanupSuccess', { count: res.cleaned || 0 }),
+      type: 'success',
+      plain: true
+    })
+    loadTempFileStats()
+  }).catch(() => {
+    ElMessage({
+      message: t('tempFileCleanupFailed'),
+      type: 'error',
+      plain: true
+    })
+  }).finally(() => {
+    tempFileCleanupLoading.value = false
   })
 }
 
@@ -1237,7 +1293,7 @@ function saveRuleCleanDays() {
 
 function loadTgChannels() {
   getTgChannels().then(res => {
-    tgChannels.value = res.data || []
+    tgChannels.value = res || []
   }).catch(() => {
     tgChannels.value = []
   })
@@ -2464,6 +2520,44 @@ form .el-button {
     font-size: 12px;
     color: #999;
     margin-left: 8px;
+  }
+}
+
+.cleanup-options {
+  margin-bottom: 15px;
+  .el-checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+}
+
+.cleanup-preview {
+  max-height: 400px;
+  overflow-y: auto;
+
+  .cleanup-section {
+    margin-bottom: 15px;
+
+    h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: var(--el-text-color-regular);
+    }
+  }
+
+  .cleanup-file-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 12px;
+    color: #666;
+    max-height: 150px;
+    overflow-y: auto;
+
+    li {
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
   }
 }
 

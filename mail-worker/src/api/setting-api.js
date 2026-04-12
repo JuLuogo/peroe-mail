@@ -34,13 +34,19 @@ app.delete('/setting/deleteBackground', async (c) => {
 });
 
 app.post('/setting/cleanupTempFiles', async (c) => {
-	const cleanupResult = await settingService.cleanupTempFiles(c, getOperatorInfo(c));
+	const { types } = await c.req.json().catch(() => ({}));
+	const cleanupResult = await settingService.cleanupTempFiles(c, getOperatorInfo(c), false, types);
 	return c.json(result.ok(cleanupResult));
 });
 
 app.get('/setting/tempFileStats', async (c) => {
 	const stats = await settingService.getTempFileStats(c);
 	return c.json(result.ok(stats));
+});
+
+app.post('/setting/previewCleanup', async (c) => {
+	const preview = await settingService.previewCleanup(c);
+	return c.json(result.ok(preview));
 });
 
 app.post('/setting/cleanupRules', async (c) => {

@@ -25,8 +25,41 @@ import sesService from './ses-service.js';
 import queueService from './queue-service.js';
 import auditService from './audit-service';
 import { auditConst } from '../entity/audit-log';
+import r2Service from './r2-service';
+import tgArchiveService from './tg-archive-service';
 
 const emailService = {
+
+	/**
+	 * 确保附件在 R2 中，如果已被清理则从 TG 恢复
+	 * 用于发送邮件前检查附件是否可访问
+	 */
+	async ensureAttachmentsInR2(c, attachments) {
+		if (!attachments || attachments.length === 0) return;
+
+		for (const att of attachments) {
+			if (!att.key) continue;
+
+			// 检查 R2 中是否存在
+			let existsInR2 = false;
+			try {
+				const obj = await r2Service.getObj(c, att.key);
+				existsInR2 = !!obj;
+			} catch (e) {
+				existsInR2 = false;
+			}
+
+			// 如果 R2 中不存在，尝试从 TG 恢复
+			if (!existsInR2 && att.attId) {
+				try {
+					await tgArchiveService.restoreFromTg(c, att.attId);
+					console.log(`[TG] 附件已从 TG 恢复: ${att.key}`);
+				} catch (e) {
+					console.error(`[TG] 从 TG 恢复附件失败: ${att.key}`, e.message);
+				}
+			}
+		}
+	},
 
 	async list(c, params, userId) {
 
@@ -301,6 +334,9 @@ const emailService = {
 		if (!allInternal) {
 
 			if (sendMethod === 'resend') {
+				// 确保附件在 R2 中（如果已被清理则从 TG 恢复）
+				await this.ensureAttachmentsInR2(c, [...imageDataList, ...attachments]);
+
 				const resend = new Resend(resendToken);
 
 				const sendForm = {
@@ -322,6 +358,8 @@ const emailService = {
 				sendResult = await resend.emails.send(sendForm);
 
 			} else if (sendMethod === 'ses') {
+				// 确保附件在 R2 中（如果已被清理则从 TG 恢复）
+				await this.ensureAttachmentsInR2(c, [...imageDataList, ...attachments]);
 
 				const sendForm = {
 					from: `${name} <${accountRow.email}>`,

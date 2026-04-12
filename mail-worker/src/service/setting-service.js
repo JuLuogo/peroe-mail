@@ -286,12 +286,18 @@ const settingService = {
 		};
 	},
 
-	async cleanupTempFiles(c, operatorInfo, isScheduled = false) {
+	async cleanupTempFiles(c, operatorInfo, isScheduled = false, types = null) {
 		const { tempFileCleanEnabled, tempFileCleanDays } = await this.query(c);
 
 		if (isScheduled && !tempFileCleanEnabled) {
 			return { cleaned: 0, message: 'Auto cleanup is disabled' };
 		}
+
+		// types: ['queue', 'deletedEmail', 'orphaned'] 或 null（全部）
+		const cleanAll = types === null || types.length === 0;
+		const shouldCleanQueue = cleanAll || types.includes('queue');
+		const shouldCleanDeletedEmail = cleanAll || types.includes('deletedEmail');
+		const shouldCleanOrphaned = cleanAll || types.includes('orphaned');
 
 		let queueCleaned = 0;
 		let attCleaned = 0;
@@ -299,121 +305,127 @@ const settingService = {
 		let totalSize = 0;
 
 		// 1. 清理队列临时文件 (email-queue-att/)
-		const queuePrefix = constant.EMAIL_QUEUE_ATT_PREFIX;
-		const queueObjects = await r2Service.listObjects(c, queuePrefix);
+		if (shouldCleanQueue) {
+			const queuePrefix = constant.EMAIL_QUEUE_ATT_PREFIX;
+			const queueObjects = await r2Service.listObjects(c, queuePrefix);
 
-		if (queueObjects.length > 0) {
-			const now = Date.now();
-			const expireTime = tempFileCleanDays * 24 * 60 * 60 * 1000;
-			const queueExpireDate = new Date(now - expireTime);
+			if (queueObjects.length > 0) {
+				const now = Date.now();
+				const expireTime = tempFileCleanDays * 24 * 60 * 60 * 1000;
+				const queueExpireDate = new Date(now - expireTime);
 
-			const toDelete = [];
+				const toDelete = [];
 
-			for (const obj of queueObjects) {
-				const uploaded = obj.uploaded || obj.LastModified;
-				if (uploaded && new Date(uploaded) < queueExpireDate) {
-					toDelete.push(obj.key);
-					totalSize += obj.size || 0;
+				for (const obj of queueObjects) {
+					const uploaded = obj.uploaded || obj.LastModified;
+					if (uploaded && new Date(uploaded) < queueExpireDate) {
+						toDelete.push(obj.key);
+						totalSize += obj.size || 0;
+					}
 				}
-			}
 
-			if (toDelete.length > 0) {
-				const batchSize = 1000;
-				for (let i = 0; i < toDelete.length; i += batchSize) {
-					const batch = toDelete.slice(i, i + batchSize);
-					await r2Service.delete(c, batch);
+				if (toDelete.length > 0) {
+					const batchSize = 1000;
+					for (let i = 0; i < toDelete.length; i += batchSize) {
+						const batch = toDelete.slice(i, i + batchSize);
+						await r2Service.delete(c, batch);
+					}
+					queueCleaned = toDelete.length;
 				}
-				queueCleaned = toDelete.length;
 			}
 		}
 
 		// 2. 清理已删除邮件的附件
-		const expireDate = new Date();
-		expireDate.setDate(expireDate.getDate() - tempFileCleanDays);
-		const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
+		if (shouldCleanDeletedEmail) {
+			const expireDate = new Date();
+			expireDate.setDate(expireDate.getDate() - tempFileCleanDays);
+			const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
 
-		// 查找已删除且超过清理天数的邮件ID
-		const deletedEmails = await orm(c)
-			.select({ emailId: email.emailId })
-			.from(email)
-			.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
-			.all();
+			// 查找已删除且超过清理天数的邮件ID
+			const deletedEmails = await orm(c)
+				.select({ emailId: email.emailId })
+				.from(email)
+				.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
+				.all();
 
-		if (deletedEmails.length > 0) {
-			const allEmailIds = deletedEmails.map((e) => e.emailId);
+			if (deletedEmails.length > 0) {
+				const allEmailIds = deletedEmails.map((e) => e.emailId);
 
-			// 分批处理，避免超过 D1/SQLite 的参数限制
-			const CHUNK_SIZE = 100;
-			for (let ci = 0; ci < allEmailIds.length; ci += CHUNK_SIZE) {
-				const emailIds = allEmailIds.slice(ci, ci + CHUNK_SIZE);
+				// 分批处理，避免超过 D1/SQLite 的参数限制
+				const CHUNK_SIZE = 100;
+				for (let ci = 0; ci < allEmailIds.length; ci += CHUNK_SIZE) {
+					const emailIds = allEmailIds.slice(ci, ci + CHUNK_SIZE);
 
-				// 统计要删除的附件大小
-				const attStats = await orm(c)
-					.select({ attSize: sum(att.size), attCount: count(att.attId) })
-					.from(att)
-					.where(inArray(att.emailId, emailIds))
-					.get();
+					// 统计要删除的附件大小
+					const attStats = await orm(c)
+						.select({ attSize: sum(att.size), attCount: count(att.attId) })
+						.from(att)
+						.where(inArray(att.emailId, emailIds))
+						.get();
 
-				totalSize += Number(attStats?.attSize) || 0;
-				attCleaned += attStats?.attCount || 0;
+					totalSize += Number(attStats?.attSize) || 0;
+					attCleaned += attStats?.attCount || 0;
 
-				// 删除附件：先查出仅被这些邮件引用的附件key，再从存储中删除，最后删数据库记录
-				// 使用与 att-service.removeAttByField 相同的逻辑：只删除引用计数为1的key的存储文件
-				const sqlList = [];
-				for (const emailId of emailIds) {
-					sqlList.push(
-						c.env.db
-							.prepare(
-								`SELECT a.key, a.att_id
-								FROM attachments a
-								JOIN (SELECT key FROM attachments GROUP BY key HAVING COUNT(*) = 1) t
-								ON a.key = t.key
-								WHERE a.email_id = ?;`,
-							)
-							.bind(emailId),
-					);
-					sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE email_id = ?`).bind(emailId));
-				}
-
-				const attListResult = await c.env.db.batch(sqlList);
-				const delKeyList = attListResult.flatMap((r) => (r.results ? r.results.map((row) => row.key) : []));
-
-				if (delKeyList.length > 0) {
-					const BATCH_SIZE = 1000;
-					for (let i = 0; i < delKeyList.length; i += BATCH_SIZE) {
-						const batch = delKeyList.slice(i, i + BATCH_SIZE);
-						await r2Service.delete(c, batch);
+					// 删除附件：先查出仅被这些邮件引用的附件key，再从存储中删除，最后删数据库记录
+					// 使用与 att-service.removeAttByField 相同的逻辑：只删除引用计数为1的key的存储文件
+					const sqlList = [];
+					for (const emailId of emailIds) {
+						sqlList.push(
+							c.env.db
+								.prepare(
+									`SELECT a.key, a.att_id
+									FROM attachments a
+									JOIN (SELECT key FROM attachments GROUP BY key HAVING COUNT (*) = 1) t
+									ON a.key = t.key
+									WHERE a.email_id = ?;`,
+								)
+								.bind(emailId),
+						);
+						sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE email_id = ?`).bind(emailId));
 					}
-				}
 
-				// 物理删除邮件记录
-				await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+					const attListResult = await c.env.db.batch(sqlList);
+					const delKeyList = attListResult.flatMap((r) => (r.results ? r.results.map((row) => row.key) : []));
+
+					if (delKeyList.length > 0) {
+						const BATCH_SIZE = 1000;
+						for (let i = 0; i < delKeyList.length; i += BATCH_SIZE) {
+							const batch = delKeyList.slice(i, i + BATCH_SIZE);
+							await r2Service.delete(c, batch);
+						}
+					}
+
+					// 物理删除邮件记录
+					await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+				}
 			}
 		}
 
 		// 3. 清理孤立的 attachments/ 文件（存储中存在但数据库中无记录）
-		const attPrefix = constant.ATTACHMENT_PREFIX;
-		const storageObjects = await r2Service.listObjects(c, attPrefix);
+		if (shouldCleanOrphaned) {
+			const attPrefix = constant.ATTACHMENT_PREFIX;
+			const storageObjects = await r2Service.listObjects(c, attPrefix);
 
-		if (storageObjects.length > 0) {
-			const dbKeysResult = await orm(c).selectDistinct({ key: att.key }).from(att).all();
-			const dbKeys = new Set(dbKeysResult.map((r) => r.key));
+			if (storageObjects.length > 0) {
+				const dbKeysResult = await orm(c).selectDistinct({ key: att.key }).from(att).all();
+				const dbKeys = new Set(dbKeysResult.map((r) => r.key));
 
-			const orphanedKeys = [];
-			for (const obj of storageObjects) {
-				if (!dbKeys.has(obj.key)) {
-					orphanedKeys.push(obj.key);
-					totalSize += obj.size || 0;
+				const orphanedKeys = [];
+				for (const obj of storageObjects) {
+					if (!dbKeys.has(obj.key)) {
+						orphanedKeys.push(obj.key);
+						totalSize += obj.size || 0;
+					}
 				}
-			}
 
-			if (orphanedKeys.length > 0) {
-				const BATCH_SIZE = 1000;
-				for (let i = 0; i < orphanedKeys.length; i += BATCH_SIZE) {
-					const batch = orphanedKeys.slice(i, i + BATCH_SIZE);
-					await r2Service.delete(c, batch);
+				if (orphanedKeys.length > 0) {
+					const BATCH_SIZE = 1000;
+					for (let i = 0; i < orphanedKeys.length; i += BATCH_SIZE) {
+						const batch = orphanedKeys.slice(i, i + BATCH_SIZE);
+						await r2Service.delete(c, batch);
+					}
+					orphanedCleaned = orphanedKeys.length;
 				}
-				orphanedCleaned = orphanedKeys.length;
 			}
 		}
 
@@ -430,7 +442,7 @@ const settingService = {
 			action: 'temp_file_cleanup',
 			targetType: 'system',
 			targetDesc: 'Temp File Cleanup',
-			detail: { queueCleaned, attCleaned, orphanedCleaned, deletedEmails: deletedEmails?.length || 0, totalSize },
+			detail: { queueCleaned, attCleaned, orphanedCleaned, deletedEmails: 0, totalSize, types },
 		});
 
 		return {
@@ -438,10 +450,101 @@ const settingService = {
 			queueCleaned,
 			attCleaned,
 			orphanedCleaned,
-			deletedEmails: deletedEmails?.length || 0,
 			totalSize,
-			message: `Cleaned ${queueCleaned} queue files, ${attCleaned} attachments from ${deletedEmails?.length || 0} deleted emails, ${orphanedCleaned} orphaned files`,
+			types,
+			message: `Cleaned ${queueCleaned} queue files, ${attCleaned} attachments, ${orphanedCleaned} orphaned files`,
 		};
+	},
+
+	/**
+	 * 预览清理：返回将要被清理的文件列表
+	 */
+	async previewCleanup(c) {
+		const { tempFileCleanDays } = await this.query(c);
+
+		const result = {
+			queue: { count: 0, size: 0, files: [] },
+			deletedEmail: { count: 0, size: 0, emails: [] },
+			orphaned: { count: 0, size: 0, files: [] },
+		};
+
+		// 1. 预览队列临时文件
+		const queuePrefix = constant.EMAIL_QUEUE_ATT_PREFIX;
+		const queueObjects = await r2Service.listObjects(c, queuePrefix);
+		if (queueObjects.length > 0) {
+			const now = Date.now();
+			const expireTime = tempFileCleanDays * 24 * 60 * 60 * 1000;
+			const queueExpireDate = new Date(now - expireTime);
+
+			for (const obj of queueObjects) {
+				const uploaded = obj.uploaded || obj.LastModified;
+				if (uploaded && new Date(uploaded) < queueExpireDate) {
+					result.queue.count++;
+					result.queue.size += obj.size || 0;
+					if (result.queue.files.length < 100) {
+						result.queue.files.push({ key: obj.key, size: obj.size });
+					}
+				}
+			}
+		}
+
+		// 2. 预览已删除邮件的附件
+		const expireDate = new Date();
+		expireDate.setDate(expireDate.getDate() - tempFileCleanDays);
+		const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
+
+		const deletedEmails = await orm(c)
+			.select({ emailId: email.emailId, subject: email.subject })
+			.from(email)
+			.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
+			.all();
+
+		if (deletedEmails.length > 0) {
+			const allEmailIds = deletedEmails.map((e) => e.emailId);
+			const CHUNK_SIZE = 100;
+			for (let ci = 0; ci < allEmailIds.length; ci += CHUNK_SIZE) {
+				const emailIds = allEmailIds.slice(ci, ci + CHUNK_SIZE);
+
+				const attStats = await orm(c)
+					.select({ attSize: sum(att.size), attCount: count(att.attId) })
+					.from(att)
+					.where(inArray(att.emailId, emailIds))
+					.get();
+
+				result.deletedEmail.count += attStats?.attCount || 0;
+				result.deletedEmail.size += Number(attStats?.attSize) || 0;
+			}
+
+			// 收集邮件主题用于预览
+			for (const emailRow of deletedEmails) {
+				if (result.deletedEmail.emails.length < 100) {
+					result.deletedEmail.emails.push({
+						emailId: emailRow.emailId,
+						subject: emailRow.subject,
+					});
+				}
+			}
+		}
+
+		// 3. 预览孤立文件
+		const attPrefix = constant.ATTACHMENT_PREFIX;
+		const storageObjects = await r2Service.listObjects(c, attPrefix);
+		if (storageObjects.length > 0) {
+			const dbKeysResult = await orm(c).selectDistinct({ key: att.key }).from(att).all();
+			const dbKeys = new Set(dbKeysResult.map((r) => r.key));
+
+			for (const obj of storageObjects) {
+				if (!dbKeys.has(obj.key)) {
+					result.orphaned.count++;
+					result.orphaned.size += obj.size || 0;
+					if (result.orphaned.files.length < 100) {
+						result.orphaned.files.push({ key: obj.key, size: obj.size });
+					}
+				}
+			}
+		}
+
+		return result;
 	},
 
 	async getTempFileStats(c) {
