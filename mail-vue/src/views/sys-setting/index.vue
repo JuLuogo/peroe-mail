@@ -293,8 +293,8 @@
               <div class="setting-item">
                 <div><span>{{ $t('tempFileStats') }}</span></div>
                 <div class="r2domain">
-                  <span v-if="tempFileStats.count > 0">
-                    {{ tempFileStats.count }} {{ $t('tempFiles') }}, {{ formatSize(tempFileStats.totalSize) }}
+                  <span v-if="tempFileStatsData.count > 0">
+                    {{ tempFileStatsData.count }} {{ $t('tempFiles') }}, {{ formatSize(tempFileStatsData.totalSize) }}
                   </span>
                   <span v-else>{{ $t('noTempFiles') }}</span>
                   <el-button class="opt-button" size="small" type="primary" @click="openTempFileCleanup" :loading="tempFileCleanupLoading">
@@ -1000,7 +1000,7 @@ const tgMsgToOption = [{label: t('show'), value: 'show'}, {label: t('hide'), val
 const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
 const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
 
-const tempFileStats = ref({ count: 0, totalSize: 0 })
+const tempFileStatsData = ref({ count: 0, totalSize: 0 })
 const tempFileCleanupLoading = ref(false)
 const tempFileCleanDays = ref(7)
 const ruleStatsData = ref({ totalExpired: 0, expiredFilterRules: 0, expiredForwardRules: 0 })
@@ -1035,9 +1035,9 @@ function getSettings() {
 
 function loadTempFileStats() {
   tempFileStats().then(res => {
-    tempFileStats.value = res.data || { count: 0, totalSize: 0 }
+    tempFileStatsData.value = res.data || { count: 0, totalSize: 0 }
   }).catch(() => {
-    tempFileStats.value = { count: 0, totalSize: 0 }
+    tempFileStatsData.value = { count: 0, totalSize: 0 }
   })
 }
 
