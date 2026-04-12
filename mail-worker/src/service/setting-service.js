@@ -15,7 +15,7 @@ import { forwardRule } from '../entity/forward-rule';
 import { email } from '../entity/email';
 import { att } from '../entity/att';
 import { isDel } from '../const/entity-const';
-import { lt, eq, and, inArray, sql, sum, count } from 'drizzle-orm';
+import { lt, eq, and, inArray, notInArray, sql, sum, count } from 'drizzle-orm';
 
 const settingService = {
 	async refresh(c) {
@@ -295,22 +295,23 @@ const settingService = {
 
 		let queueCleaned = 0;
 		let attCleaned = 0;
+		let orphanedCleaned = 0;
 		let totalSize = 0;
 
 		// 1. 清理队列临时文件 (email-queue-att/)
-		const prefix = constant.EMAIL_QUEUE_ATT_PREFIX;
-		const objects = await r2Service.listObjects(c, prefix);
+		const queuePrefix = constant.EMAIL_QUEUE_ATT_PREFIX;
+		const queueObjects = await r2Service.listObjects(c, queuePrefix);
 
-		if (objects.length > 0) {
+		if (queueObjects.length > 0) {
 			const now = Date.now();
 			const expireTime = tempFileCleanDays * 24 * 60 * 60 * 1000;
-			const expireDate = new Date(now - expireTime);
+			const queueExpireDate = new Date(now - expireTime);
 
 			const toDelete = [];
 
-			for (const obj of objects) {
+			for (const obj of queueObjects) {
 				const uploaded = obj.uploaded || obj.LastModified;
-				if (uploaded && new Date(uploaded) < expireDate) {
+				if (uploaded && new Date(uploaded) < queueExpireDate) {
 					toDelete.push(obj.key);
 					totalSize += obj.size || 0;
 				}
@@ -384,7 +385,33 @@ const settingService = {
 			await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
 		}
 
-		const totalCleaned = queueCleaned + attCleaned;
+		// 3. 清理孤立的 attachments/ 文件（存储中存在但数据库中无记录）
+		const attPrefix = constant.ATTACHMENT_PREFIX;
+		const storageObjects = await r2Service.listObjects(c, attPrefix);
+
+		if (storageObjects.length > 0) {
+			const dbKeysResult = await orm(c).selectDistinct({ key: att.key }).from(att).all();
+			const dbKeys = new Set(dbKeysResult.map((r) => r.key));
+
+			const orphanedKeys = [];
+			for (const obj of storageObjects) {
+				if (!dbKeys.has(obj.key)) {
+					orphanedKeys.push(obj.key);
+					totalSize += obj.size || 0;
+				}
+			}
+
+			if (orphanedKeys.length > 0) {
+				const BATCH_SIZE = 1000;
+				for (let i = 0; i < orphanedKeys.length; i += BATCH_SIZE) {
+					const batch = orphanedKeys.slice(i, i + BATCH_SIZE);
+					await r2Service.delete(c, batch);
+				}
+				orphanedCleaned = orphanedKeys.length;
+			}
+		}
+
+		const totalCleaned = queueCleaned + attCleaned + orphanedCleaned;
 
 		if (totalCleaned === 0) {
 			return { cleaned: 0, message: 'No expired files found' };
@@ -397,16 +424,17 @@ const settingService = {
 			action: 'temp_file_cleanup',
 			targetType: 'system',
 			targetDesc: 'Temp File Cleanup',
-			detail: { queueCleaned, attCleaned, deletedEmails: deletedEmails?.length || 0, totalSize },
+			detail: { queueCleaned, attCleaned, orphanedCleaned, deletedEmails: deletedEmails?.length || 0, totalSize },
 		});
 
 		return {
 			cleaned: totalCleaned,
 			queueCleaned,
 			attCleaned,
+			orphanedCleaned,
 			deletedEmails: deletedEmails?.length || 0,
 			totalSize,
-			message: `Cleaned ${queueCleaned} queue files and ${attCleaned} attachments from ${deletedEmails?.length || 0} deleted emails`,
+			message: `Cleaned ${queueCleaned} queue files, ${attCleaned} attachments from ${deletedEmails?.length || 0} deleted emails, ${orphanedCleaned} orphaned files`,
 		};
 	},
 
@@ -415,11 +443,11 @@ const settingService = {
 		const { tempFileCleanDays } = await this.query(c);
 
 		// 1. 统计队列临时文件 (email-queue-att/)
-		const prefix = constant.EMAIL_QUEUE_ATT_PREFIX;
-		const objects = await r2Service.listObjects(c, prefix);
+		const queuePrefix = constant.EMAIL_QUEUE_ATT_PREFIX;
+		const queueObjects = await r2Service.listObjects(c, queuePrefix);
 
 		let queueFileSize = 0;
-		for (const obj of objects) {
+		for (const obj of queueObjects) {
 			queueFileSize += obj.size || 0;
 		}
 
@@ -441,12 +469,33 @@ const settingService = {
 		const deletedAttCount = deletedEmailAtts?.attCount || 0;
 		const deletedAttSize = Number(deletedEmailAtts?.attSize) || 0;
 
+		// 3. 扫描 attachments/ 前缀，找出孤立文件（存储中存在但数据库中无记录）
+		const attPrefix = constant.ATTACHMENT_PREFIX;
+		const storageObjects = await r2Service.listObjects(c, attPrefix);
+
+		let orphanedCount = 0;
+		let orphanedSize = 0;
+
+		if (storageObjects.length > 0) {
+			// 从数据库获取所有正在使用的 attachment key
+			const dbKeysResult = await orm(c).selectDistinct({ key: att.key }).from(att).all();
+			const dbKeys = new Set(dbKeysResult.map((r) => r.key));
+
+			for (const obj of storageObjects) {
+				if (!dbKeys.has(obj.key)) {
+					orphanedCount++;
+					orphanedSize += obj.size || 0;
+				}
+			}
+		}
+
 		return {
 			storageType,
-			count: objects.length + deletedAttCount,
-			totalSize: queueFileSize + deletedAttSize,
-			queueTempFiles: objects.length,
+			count: queueObjects.length + deletedAttCount + orphanedCount,
+			totalSize: queueFileSize + deletedAttSize + orphanedSize,
+			queueTempFiles: queueObjects.length,
 			deletedEmailAtts: deletedAttCount,
+			orphanedFiles: orphanedCount,
 		};
 	},
 
