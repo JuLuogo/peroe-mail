@@ -98,7 +98,9 @@ const requirePerms = [
 	'/forward-rule/add',
 	'/forward-rule/update',
 	'/forward-rule/delete',
-	'/forward-rule/toggle'
+	'/forward-rule/toggle',
+	'/tg/channels',
+	'/tg/archive'
 ];
 
 const permKey = {
@@ -156,6 +158,10 @@ const permKey = {
 	'temp-file-clean:action': ['/setting/cleanupTempFiles'],
 	'rule-clean:query': ['/setting/ruleStats'],
 	'rule-clean:action': ['/setting/cleanupRules'],
+	'tg-channel:query': ['/tg/channels', '/tg/archive'],
+	'tg-channel:add': ['/tg/channels'],
+	'tg-channel:update': ['/tg/channels'],
+	'tg-channel:delete': ['/tg/channels'],
 };
 
 app.use('*', async (c, next) => {

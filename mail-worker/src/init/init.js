@@ -39,6 +39,7 @@ const dbInit = {
 		await this.v2_18DB(c);
 		await this.v2_19DB(c);
 		await this.v2_20DB(c);
+		await this.v2_21DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -260,6 +261,22 @@ const dbInit = {
 			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_tg_archive_channel_id ON tg_archive(channel_id);`).run();
 		} catch (e) {
 			console.warn(`跳过索引创建：${e.message}`);
+		}
+	},
+
+	async v2_21DB(c) {
+		// 添加 TG 频道管理权限
+		try {
+			await c.env.db.prepare(`
+				INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
+				(74, 'TG频道管理', NULL, 0, 1, 7.1),
+				(75, '频道查看', 'tg-channel:query', 74, 2, 0),
+				(76, '频道添加', 'tg-channel:add', 74, 2, 1),
+				(77, '频道修改', 'tg-channel:update', 74, 2, 2),
+				(78, '频道删除', 'tg-channel:delete', 74, 2, 3)
+			`).run();
+		} catch (e) {
+			console.warn(`跳过权限数据：${e.message}`);
 		}
 	},
 
