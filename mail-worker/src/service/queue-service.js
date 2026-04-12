@@ -9,6 +9,7 @@
 
 import r2Service from './r2-service';
 import settingService from './setting-service';
+import KvConst from '../const/kv-const';
 
 const queueService = {
     /**
@@ -297,13 +298,23 @@ const queueService = {
 
         const { from, to, subject, text, html, headers, attachments } = data;
         console.log(`[Queue] Email details - From: ${from}, To: ${JSON.stringify(to)}, Subject: ${subject}`);
-        console.log(`[Queue] Has text: !!text, Has html: !!html, Has headers: !!headers, Attachments count: ${attachments?.length || 0}`);
+        console.log(`[Queue] Has text: ${!!text}, Has html: ${!!html}, Has headers: ${!!headers}, Attachments count: ${attachments?.length || 0}`);
 
         try {
-            const localApiUrl = env.local_ses_api_url;
-            const apiKey = env.local_ses_api_key;
+            let localApiUrl = env.local_ses_api_url;
+            let apiKey = env.local_ses_api_key;
 
-            console.log(`[Queue] Local API URL: ${localApiUrl}, Has API Key: !!apiKey`);
+            if (!localApiUrl) {
+                const kvSetting = await env.kv.get(KvConst.SETTING, { type: 'json' });
+                if (kvSetting) {
+                    localApiUrl = kvSetting.localSesApiUrl;
+                    if (!apiKey) {
+                        apiKey = kvSetting.localSesApiKey;
+                    }
+                }
+            }
+
+            console.log(`[Queue] Local API URL: ${localApiUrl}, Has API Key: ${!!apiKey}`);
 
             if (!localApiUrl) {
                 throw new Error('LOCAL_SES_API_URL not configured');
