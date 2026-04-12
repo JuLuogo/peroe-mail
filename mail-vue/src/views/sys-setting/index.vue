@@ -962,6 +962,11 @@
       <!-- Temp File Cleanup Preview Dialog -->
       <el-dialog v-model="tempFilePreviewShow" :title="$t('tempFileCleanup')" width="600" top="5vh">
         <div class="cleanup-options">
+          <div class="cleanup-days-input">
+            <span>{{ $t('cleanupDays') }}:</span>
+            <el-input-number v-model="selectedCleanupDays" :min="0" :max="365" size="small" />
+            <span class="cleanup-days-hint">(0 = {{ $t('cleanupAll') }})</span>
+          </div>
           <el-checkbox-group v-model="selectedCleanupTypes">
             <el-checkbox label="queue">{{ $t('cleanupQueueFiles') }} ({{ cleanupPreview?.queue?.count || 0 }})</el-checkbox>
             <el-checkbox label="deletedEmail">{{ $t('cleanupDeletedEmailAtts') }} ({{ cleanupPreview?.deletedEmail?.count || 0 }})</el-checkbox>
@@ -996,6 +1001,7 @@
         </div>
         <template #footer>
           <el-button @click="tempFilePreviewShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="refreshPreview">{{ $t('refresh') }}</el-button>
           <el-button type="primary" @click="executeCleanup" :loading="tempFileCleanupLoading">{{ $t('cleanup') }}</el-button>
         </template>
       </el-dialog>
@@ -1143,6 +1149,7 @@ const tempFileCleanDays = ref(7)
 const tempFilePreviewShow = ref(false)
 const cleanupPreview = ref(null)
 const selectedCleanupTypes = ref(['queue', 'deletedEmail', 'orphaned'])
+const selectedCleanupDays = ref(0)
 const ruleStatsData = ref({ totalExpired: 0, expiredFilterRules: 0, expiredForwardRules: 0 })
 const ruleCleanupLoading = ref(false)
 const ruleCleanDays = ref(30)
@@ -1220,8 +1227,13 @@ function formatSize(bytes) {
 
 function openTempFileCleanup() {
   selectedCleanupTypes.value = ['queue', 'deletedEmail', 'orphaned']
+  selectedCleanupDays.value = 0
   tempFilePreviewShow.value = true
-  previewCleanup().then(res => {
+  refreshPreview()
+}
+
+function refreshPreview() {
+  previewCleanup(selectedCleanupDays.value).then(res => {
     cleanupPreview.value = res
   }).catch(() => {
     cleanupPreview.value = null
@@ -1239,7 +1251,7 @@ function executeCleanup() {
   }
   tempFilePreviewShow.value = false
   tempFileCleanupLoading.value = true
-  cleanupTempFiles(selectedCleanupTypes.value).then(res => {
+  cleanupTempFiles(selectedCleanupTypes.value, selectedCleanupDays.value).then(res => {
     ElMessage({
       message: t('tempFileCleanupSuccess', { count: res.cleaned || 0 }),
       type: 'success',
@@ -2525,6 +2537,16 @@ form .el-button {
 
 .cleanup-options {
   margin-bottom: 15px;
+  .cleanup-days-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    .cleanup-days-hint {
+      font-size: 12px;
+      color: #999;
+    }
+  }
   .el-checkbox-group {
     display: flex;
     flex-wrap: wrap;

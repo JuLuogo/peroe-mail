@@ -286,12 +286,15 @@ const settingService = {
 		};
 	},
 
-	async cleanupTempFiles(c, operatorInfo, isScheduled = false, types = null) {
+	async cleanupTempFiles(c, operatorInfo, isScheduled = false, types = null, days = null) {
 		const { tempFileCleanEnabled, tempFileCleanDays } = await this.query(c);
 
 		if (isScheduled && !tempFileCleanEnabled) {
 			return { cleaned: 0, message: 'Auto cleanup is disabled' };
 		}
+
+		// days: null表示使用tempFileCleanDays，0表示清理所有
+		const cleanDays = days === null ? tempFileCleanDays : days;
 
 		// types: ['queue', 'deletedEmail', 'orphaned'] 或 null（全部）
 		const cleanAll = types === null || types.length === 0;
@@ -310,17 +313,25 @@ const settingService = {
 			const queueObjects = await r2Service.listObjects(c, queuePrefix);
 
 			if (queueObjects.length > 0) {
-				const now = Date.now();
-				const expireTime = tempFileCleanDays * 24 * 60 * 60 * 1000;
-				const queueExpireDate = new Date(now - expireTime);
-
 				const toDelete = [];
 
-				for (const obj of queueObjects) {
-					const uploaded = obj.uploaded || obj.LastModified;
-					if (uploaded && new Date(uploaded) < queueExpireDate) {
+				// cleanDays=0 表示清理所有
+				if (cleanDays === 0) {
+					for (const obj of queueObjects) {
 						toDelete.push(obj.key);
 						totalSize += obj.size || 0;
+					}
+				} else {
+					const now = Date.now();
+					const expireTime = cleanDays * 24 * 60 * 60 * 1000;
+					const queueExpireDate = new Date(now - expireTime);
+
+					for (const obj of queueObjects) {
+						const uploaded = obj.uploaded || obj.LastModified;
+						if (uploaded && new Date(uploaded) < queueExpireDate) {
+							toDelete.push(obj.key);
+							totalSize += obj.size || 0;
+						}
 					}
 				}
 
@@ -337,16 +348,27 @@ const settingService = {
 
 		// 2. 清理已删除邮件的附件
 		if (shouldCleanDeletedEmail) {
-			const expireDate = new Date();
-			expireDate.setDate(expireDate.getDate() - tempFileCleanDays);
-			const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
+			let deletedEmails;
 
-			// 查找已删除且超过清理天数的邮件ID
-			const deletedEmails = await orm(c)
-				.select({ emailId: email.emailId })
-				.from(email)
-				.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
-				.all();
+			// cleanDays=0 表示清理所有已删除邮件的附件
+			if (cleanDays === 0) {
+				deletedEmails = await orm(c)
+					.select({ emailId: email.emailId })
+					.from(email)
+					.where(eq(email.isDel, isDel.DELETE))
+					.all();
+			} else {
+				const expireDate = new Date();
+				expireDate.setDate(expireDate.getDate() - cleanDays);
+				const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
+
+				// 查找已删除且超过清理天数的邮件ID
+				deletedEmails = await orm(c)
+					.select({ emailId: email.emailId })
+					.from(email)
+					.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
+					.all();
+			}
 
 			if (deletedEmails.length > 0) {
 				const allEmailIds = deletedEmails.map((e) => e.emailId);
@@ -458,51 +480,66 @@ const settingService = {
 
 	/**
 	 * 预览清理：返回将要被清理的文件列表
+	 * @param {object} c - 上下文
+	 * @param {number|null} days - 清理天数，null表示使用tempFileCleanDays，0表示清理所有
 	 */
-	async previewCleanup(c) {
+	async previewCleanup(c, days = null) {
 		const { tempFileCleanDays } = await this.query(c);
+		// 如果days为null，使用设置的tempFileCleanDays；days=0表示清理所有
+		const cleanDays = days === null ? tempFileCleanDays : days;
 
 		const result = {
 			queue: { count: 0, size: 0, files: [] },
 			deletedEmail: { count: 0, size: 0, emails: [] },
 			orphaned: { count: 0, size: 0, files: [] },
 		};
-
-		// 调试日志
-		console.log('[PreviewCleanup] tempFileCleanDays:', tempFileCleanDays);
-
 		// 1. 预览队列临时文件
 		const queuePrefix = constant.EMAIL_QUEUE_ATT_PREFIX;
-		console.log('[PreviewCleanup] queuePrefix:', queuePrefix);
 		const queueObjects = await r2Service.listObjects(c, queuePrefix);
-		console.log('[PreviewCleanup] queueObjects length:', queueObjects.length);
 		if (queueObjects.length > 0) {
-			const now = Date.now();
-			const expireTime = tempFileCleanDays * 24 * 60 * 60 * 1000;
-			const queueExpireDate = new Date(now - expireTime);
+			// cleanDays=0 表示清理所有
+			if (cleanDays === 0) {
+				result.queue.count = queueObjects.length;
+				result.queue.size = queueObjects.reduce((sum, obj) => sum + (obj.size || 0), 0);
+				result.queue.files = queueObjects.slice(0, 100).map(obj => ({ key: obj.key, size: obj.size }));
+			} else {
+				const now = Date.now();
+				const expireTime = cleanDays * 24 * 60 * 60 * 1000;
+				const queueExpireDate = new Date(now - expireTime);
 
-			for (const obj of queueObjects) {
-				const uploaded = obj.uploaded || obj.LastModified;
-				if (uploaded && new Date(uploaded) < queueExpireDate) {
-					result.queue.count++;
-					result.queue.size += obj.size || 0;
-					if (result.queue.files.length < 100) {
-						result.queue.files.push({ key: obj.key, size: obj.size });
+				for (const obj of queueObjects) {
+					const uploaded = obj.uploaded || obj.LastModified;
+					if (uploaded && new Date(uploaded) < queueExpireDate) {
+						result.queue.count++;
+						result.queue.size += obj.size || 0;
+						if (result.queue.files.length < 100) {
+							result.queue.files.push({ key: obj.key, size: obj.size });
+						}
 					}
 				}
 			}
 		}
 
 		// 2. 预览已删除邮件的附件
-		const expireDate = new Date();
-		expireDate.setDate(expireDate.getDate() - tempFileCleanDays);
-		const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
+		// cleanDays=0 表示清理所有已删除邮件的附件
+		let deletedEmails;
+		if (cleanDays === 0) {
+			deletedEmails = await orm(c)
+				.select({ emailId: email.emailId, subject: email.subject })
+				.from(email)
+				.where(eq(email.isDel, isDel.DELETE))
+				.all();
+		} else {
+			const expireDate = new Date();
+			expireDate.setDate(expireDate.getDate() - cleanDays);
+			const expireDateStr = expireDate.toISOString().slice(0, 19).replace('T', ' ');
 
-		const deletedEmails = await orm(c)
-			.select({ emailId: email.emailId, subject: email.subject })
-			.from(email)
-			.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
-			.all();
+			deletedEmails = await orm(c)
+				.select({ emailId: email.emailId, subject: email.subject })
+				.from(email)
+				.where(and(eq(email.isDel, isDel.DELETE), lt(email.createTime, expireDateStr)))
+				.all();
+		}
 
 		if (deletedEmails.length > 0) {
 			const allEmailIds = deletedEmails.map((e) => e.emailId);
@@ -531,11 +568,9 @@ const settingService = {
 			}
 		}
 
-		// 3. 预览孤立文件
+		// 3. 预览孤立文件（孤立文件不受日期限制）
 		const attPrefix = constant.ATTACHMENT_PREFIX;
-		console.log('[PreviewCleanup] attPrefix:', attPrefix);
 		const storageObjects = await r2Service.listObjects(c, attPrefix);
-		console.log('[PreviewCleanup] storageObjects length:', storageObjects.length);
 		if (storageObjects.length > 0) {
 			const dbKeysResult = await orm(c).selectDistinct({ key: att.key }).from(att).all();
 			const dbKeys = new Set(dbKeysResult.map((r) => r.key));
