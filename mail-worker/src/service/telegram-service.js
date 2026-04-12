@@ -135,15 +135,24 @@ const telegramService = {
 	async recordArchiveResults(c, channel, attachments, results) {
 		if (!results || results.length === 0) return;
 
-		// 建立附件 attId 列表，与 TG 返回消息按顺序对应
-		let attIndex = 0;
-		for (const msgResult of results) {
+		const MAX_MEDIA_PER_GROUP = 10;
+
+		// results 数组与 batches 一一对应（失败的批次为 null）
+		// 通过 batchIndex 计算正确的附件偏移量
+		for (let batchIndex = 0; batchIndex < results.length; batchIndex++) {
+			const msgResult = results[batchIndex];
 			if (!msgResult || !msgResult.result) continue;
 
+			const batchOffset = batchIndex * MAX_MEDIA_PER_GROUP;
 			const messages = Array.isArray(msgResult.result) ? msgResult.result : [msgResult.result];
-			for (const msg of messages) {
+
+			for (let msgIndex = 0; msgIndex < messages.length; msgIndex++) {
+				const msg = messages[msgIndex];
+				const attIndex = batchOffset + msgIndex;
+				if (attIndex >= attachments.length) break;
+
 				const fileInfo = this.extractFileInfo(msg);
-				if (fileInfo && attIndex < attachments.length) {
+				if (fileInfo) {
 					try {
 						await tgArchiveService.recordArchive(c, attachments[attIndex].attId, channel.id, {
 							file_id: fileInfo.file_id,
@@ -154,7 +163,6 @@ const telegramService = {
 						console.error(`[TG Archive] 记录归档失败:`, e.message);
 					}
 				}
-				attIndex++;
 			}
 		}
 	},
@@ -310,6 +318,7 @@ const telegramService = {
 
 			if (!res.ok) {
 				console.error(`发送媒体组失败 status: ${res.status} response: ${await res.text()}`);
+				results.push(null);
 			} else {
 				const resData = await res.json();
 				results.push(resData);
