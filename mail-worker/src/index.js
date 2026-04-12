@@ -23,7 +23,7 @@ export default {
 	async scheduled(c, env, ctx) {
 		const scheduledContext = { env };
 		const systemOperator = { userId: 0, userEmail: 'system' };
-		await Promise.all([
+		const results = await Promise.allSettled([
 			verifyRecordService.clearRecord(scheduledContext),
 			userService.resetDaySendCount(scheduledContext),
 			emailService.completeReceiveAll(scheduledContext),
@@ -31,6 +31,12 @@ export default {
 			settingService.cleanupTempFiles(scheduledContext, systemOperator, true),
 			settingService.cleanupRules(scheduledContext, systemOperator, true),
 		]);
+
+		for (const result of results) {
+			if (result.status === 'rejected') {
+				console.error('[Scheduled] Task failed:', result.reason);
+			}
+		}
 	},
 	// Cloudflare Queues 消费者
 	async queue(batch, env, ctx) {

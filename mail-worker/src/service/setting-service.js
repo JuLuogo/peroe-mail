@@ -340,49 +340,55 @@ const settingService = {
 			.all();
 
 		if (deletedEmails.length > 0) {
-			const emailIds = deletedEmails.map((e) => e.emailId);
+			const allEmailIds = deletedEmails.map((e) => e.emailId);
 
-			// 统计要删除的附件大小
-			const attStats = await orm(c)
-				.select({ attSize: sum(att.size), attCount: count(att.attId) })
-				.from(att)
-				.where(inArray(att.emailId, emailIds))
-				.get();
+			// 分批处理，避免超过 D1/SQLite 的参数限制
+			const CHUNK_SIZE = 100;
+			for (let ci = 0; ci < allEmailIds.length; ci += CHUNK_SIZE) {
+				const emailIds = allEmailIds.slice(ci, ci + CHUNK_SIZE);
 
-			totalSize += Number(attStats?.attSize) || 0;
-			attCleaned = attStats?.attCount || 0;
+				// 统计要删除的附件大小
+				const attStats = await orm(c)
+					.select({ attSize: sum(att.size), attCount: count(att.attId) })
+					.from(att)
+					.where(inArray(att.emailId, emailIds))
+					.get();
 
-			// 删除附件：先查出仅被这些邮件引用的附件key，再从存储中删除，最后删数据库记录
-			// 使用与 att-service.removeAttByField 相同的逻辑：只删除引用计数为1的key的存储文件
-			const sqlList = [];
-			for (const emailId of emailIds) {
-				sqlList.push(
-					c.env.db
-						.prepare(
-							`SELECT a.key, a.att_id
-							FROM attachments a
-							JOIN (SELECT key FROM attachments GROUP BY key HAVING COUNT(*) = 1) t
-							ON a.key = t.key
-							WHERE a.email_id = ?;`,
-						)
-						.bind(emailId),
-				);
-				sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE email_id = ?`).bind(emailId));
-			}
+				totalSize += Number(attStats?.attSize) || 0;
+				attCleaned += attStats?.attCount || 0;
 
-			const attListResult = await c.env.db.batch(sqlList);
-			const delKeyList = attListResult.flatMap((r) => (r.results ? r.results.map((row) => row.key) : []));
-
-			if (delKeyList.length > 0) {
-				const BATCH_SIZE = 1000;
-				for (let i = 0; i < delKeyList.length; i += BATCH_SIZE) {
-					const batch = delKeyList.slice(i, i + BATCH_SIZE);
-					await r2Service.delete(c, batch);
+				// 删除附件：先查出仅被这些邮件引用的附件key，再从存储中删除，最后删数据库记录
+				// 使用与 att-service.removeAttByField 相同的逻辑：只删除引用计数为1的key的存储文件
+				const sqlList = [];
+				for (const emailId of emailIds) {
+					sqlList.push(
+						c.env.db
+							.prepare(
+								`SELECT a.key, a.att_id
+								FROM attachments a
+								JOIN (SELECT key FROM attachments GROUP BY key HAVING COUNT(*) = 1) t
+								ON a.key = t.key
+								WHERE a.email_id = ?;`,
+							)
+							.bind(emailId),
+					);
+					sqlList.push(c.env.db.prepare(`DELETE FROM attachments WHERE email_id = ?`).bind(emailId));
 				}
-			}
 
-			// 物理删除邮件记录
-			await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+				const attListResult = await c.env.db.batch(sqlList);
+				const delKeyList = attListResult.flatMap((r) => (r.results ? r.results.map((row) => row.key) : []));
+
+				if (delKeyList.length > 0) {
+					const BATCH_SIZE = 1000;
+					for (let i = 0; i < delKeyList.length; i += BATCH_SIZE) {
+						const batch = delKeyList.slice(i, i + BATCH_SIZE);
+						await r2Service.delete(c, batch);
+					}
+				}
+
+				// 物理删除邮件记录
+				await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+			}
 		}
 
 		// 3. 清理孤立的 attachments/ 文件（存储中存在但数据库中无记录）
