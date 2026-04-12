@@ -76,21 +76,90 @@ const userService = {
 			.get();
 	},
 
+	// 仅用于登录认证，需要返回 password、salt 和 status
+	selectForAuth(c, email) {
+		return orm(c).select({
+			userId: user.userId,
+			email: user.email,
+			password: user.password,
+			salt: user.salt,
+			status: user.status,
+			isDel: user.isDel
+		}).from(user).where(
+			and(
+				eq(user.email, email),
+				eq(user.isDel, isDel.NORMAL)))
+			.get();
+	},
+
 	async insert(c, params) {
 		const { userId } = await orm(c).insert(user).values({ ...params }).returning().get();
 		return userId;
 	},
 
+	// 仅返回非敏感字段，用于一般用户信息查询
 	selectByEmailIncludeDel(c, email) {
-		return orm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${email}`).get();
+		return orm(c).select({
+			userId: user.userId,
+			email: user.email,
+			type: user.type,
+			status: user.status,
+			createTime: user.createTime,
+			activeTime: user.activeTime,
+			sendCount: user.sendCount,
+			regKeyId: user.regKeyId,
+			isDel: user.isDel,
+			forwardStatus: user.forwardStatus,
+			forwardEmail: user.forwardEmail,
+			totpEnabled: user.totpEnabled,
+			availDomain: user.availDomain
+		}).from(user).where(sql`${user.email} COLLATE NOCASE = ${email}`).get();
 	},
 
 	selectByIdIncludeDel(c, userId) {
-		return orm(c).select().from(user).where(eq(user.userId, userId)).get();
+		return orm(c).select({
+			userId: user.userId,
+			email: user.email,
+			type: user.type,
+			status: user.status,
+			createTime: user.createTime,
+			activeTime: user.activeTime,
+			createIp: user.createIp,
+			activeIp: user.activeIp,
+			os: user.os,
+			browser: user.browser,
+			device: user.device,
+			sendCount: user.sendCount,
+			regKeyId: user.regKeyId,
+			isDel: user.isDel,
+			forwardStatus: user.forwardStatus,
+			forwardEmail: user.forwardEmail,
+			totpEnabled: user.totpEnabled,
+			availDomain: user.availDomain
+		}).from(user).where(eq(user.userId, userId)).get();
 	},
 
 	selectById(c, userId) {
-		return orm(c).select().from(user).where(
+		return orm(c).select({
+			userId: user.userId,
+			email: user.email,
+			type: user.type,
+			status: user.status,
+			createTime: user.createTime,
+			activeTime: user.activeTime,
+			createIp: user.createIp,
+			activeIp: user.activeIp,
+			os: user.os,
+			browser: user.browser,
+			device: user.device,
+			sendCount: user.sendCount,
+			regKeyId: user.regKeyId,
+			isDel: user.isDel,
+			forwardStatus: user.forwardStatus,
+			forwardEmail: user.forwardEmail,
+			totpEnabled: user.totpEnabled,
+			availDomain: user.availDomain
+		}).from(user).where(
 			and(
 				eq(user.userId, userId),
 				eq(user.isDel, isDel.NORMAL)))
@@ -167,8 +236,27 @@ const userService = {
 		}
 
 
+		// 只查询需要的字段，排除敏感字段（password, salt, totpSecret 等）
 		const query = orm(c).select({
-			...user,
+			userId: user.userId,
+			email: user.email,
+			type: user.type,
+			status: user.status,
+			createTime: user.createTime,
+			activeTime: user.activeTime,
+			createIp: user.createIp,
+			activeIp: user.activeIp,
+			os: user.os,
+			browser: user.browser,
+			device: user.device,
+			sendCount: user.sendCount,
+			regKeyId: user.regKeyId,
+			isDel: user.isDel,
+			forwardStatus: user.forwardStatus,
+			forwardEmail: user.forwardEmail,
+			totpEnabled: user.totpEnabled,
+			availDomain: user.availDomain,
+			// oauth 字段
 			username: oauth.username,
 			trustLevel: oauth.trustLevel,
 			avatar: oauth.avatar,

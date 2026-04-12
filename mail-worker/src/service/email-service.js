@@ -940,7 +940,7 @@ const emailService = {
 		];
 
 		// 并行执行列表查询、总数查询和最新归档邮件查询
-		const [list, total, latestEmail] = await Promise.all([
+		let [list, total, latestEmail] = await Promise.all([
 			orm(c)
 				.select({
 					...email,

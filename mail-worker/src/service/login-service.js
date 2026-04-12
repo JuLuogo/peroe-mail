@@ -207,7 +207,8 @@ const loginService = {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
+		// 使用专门的认证查询，只返回必要的认证字段
+		const userRow = await userService.selectForAuth(c, email);
 
 		if (!userRow) {
 			throw new BizError(t('notExistUser'));
@@ -228,6 +229,13 @@ const loginService = {
 		const uuid = uuidv4();
 		const jwt = await JwtUtils.generateToken(c,{ userId: userRow.userId, token: uuid });
 
+		// 构建用户信息对象（不包含密码和盐字段）
+		const userInfo = {
+			userId: userRow.userId,
+			email: userRow.email,
+			type: userRow.type
+		};
+
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
 		if (authInfo && (authInfo.user.email === userRow.email)) {
@@ -242,7 +250,7 @@ const loginService = {
 
 			authInfo = {
 				tokens: [],
-				user: userRow,
+				user: userInfo,
 				refreshTime: dayjs().toISOString()
 			};
 

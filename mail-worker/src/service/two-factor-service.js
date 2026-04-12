@@ -19,7 +19,12 @@ const twoFactorService = {
 	},
 
 	async getSetupData(c, userId) {
-		const userRow = await orm(c).select().from(user)
+		// 只查询需要的字段，避免暴露敏感信息
+		const userRow = await orm(c).select({
+			email: user.email,
+			totpSecret: user.totpSecret,
+			totpEnabled: user.totpEnabled
+		}).from(user)
 			.where(and(eq(user.userId, userId), eq(user.isDel, 0))).get();
 
 		if (!userRow) {
@@ -59,10 +64,14 @@ const twoFactorService = {
 	async disable(c, params, userId) {
 		const { code } = params;
 
-		const userRow = await orm(c).select().from(user)
+		// 只查询需要的字段
+		const userRow = await orm(c).select({
+			totpSecret: user.totpSecret,
+			totpEnabled: user.totpEnabled
+		}).from(user)
 			.where(eq(user.userId, userId)).get();
 
-		if (!userRow.totpEnabled) {
+		if (!userRow?.totpEnabled) {
 			throw new BizError(t('twoFactorNotEnabled'));
 		}
 
@@ -80,7 +89,11 @@ const twoFactorService = {
 	async verify(c, params, userId) {
 		const { code } = params;
 
-		const userRow = await orm(c).select().from(user)
+		// 只查询需要的字段
+		const userRow = await orm(c).select({
+			totpSecret: user.totpSecret,
+			totpEnabled: user.totpEnabled
+		}).from(user)
 			.where(and(eq(user.userId, userId), eq(user.isDel, 0))).get();
 
 		if (!userRow || !userRow.totpEnabled) {

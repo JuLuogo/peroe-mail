@@ -195,7 +195,8 @@ const publicService = {
 
 		const { email, password } = params
 
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
+		// 使用专门的认证查询
+		const userRow = await userService.selectForAuth(c, email);
 
 		if (email !== c.env.admin) {
 			throw new BizError(t('notAdmin'));
