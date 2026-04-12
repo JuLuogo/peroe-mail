@@ -10,7 +10,6 @@ import '../api/star-api';
 import '../api/test-api';
 import '../api/r2-api';
 import '../api/resend-api';
-import '../api/user-api';
 import '../api/my-api';
 import '../api/role-api'
 import '../api/all-email-api'
@@ -25,4 +24,5 @@ import '../api/audit-api'
 import '../api/filter-api'
 import '../api/2fa-api'
 import '../api/forward-rule-api'
+import '../api/kv-api'
 export default app;

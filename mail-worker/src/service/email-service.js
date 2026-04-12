@@ -511,23 +511,30 @@ const emailService = {
 
 		}
 
-		//保存邮件
+		//保存邮件（批量插入，避免 N+1 问题）
 		const receiveEmailList = emailDataList.filter(emailRow => emailRow.status === emailConst.status.RECEIVE || emailRow.status === emailConst.status.NOONE);
 
-		for (const emailData of receiveEmailList) {
+		if (receiveEmailList.length > 0) {
+			// 批量插入所有邮件
+			const insertedEmails = await orm(c).insert(email).values(receiveEmailList).returning().all();
 
-			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
-
-			//设置附件保存
-			for (const attRow of attList) {
-				const attValues = {...attRow};
-				attValues.emailId = emailRow.emailId;
-				attValues.accountId = emailRow.accountId;
-				attValues.userId = emailRow.userId;
-				attValues.attId = null;
-				await orm(c).insert(att).values(attValues).run();
+			// 如果有附件，批量插入附件（每个邮件对应所有附件）
+			if (attList.length > 0) {
+				const attValuesList = [];
+				for (const emailRow of insertedEmails) {
+					for (const attRow of attList) {
+						attValuesList.push({
+							...attRow,
+							emailId: emailRow.emailId,
+							accountId: emailRow.accountId,
+							userId: emailRow.userId,
+							attId: null
+						});
+					}
+				}
+				// 批量插入所有附件
+				await orm(c).insert(att).values(attValuesList).run();
 			}
-
 		}
 
 		const bouncedEmail = emailDataList.find(emailRow => emailRow.status === emailConst.status.BOUNCED);
@@ -925,29 +932,37 @@ const emailService = {
 			}
 		}
 
-		const list = await orm(c)
-			.select({
-				...email,
-				starId: star.starId
-			})
-			.from(email)
-			.leftJoin(
-				star,
-				and(
-					eq(star.emailId, email.emailId),
-					eq(star.userId, userId)
-				)
-			)
-			.where(and(...conditions))
-			.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
-			.limit(size).all();
+		// 构架总数查询条件
+		const totalConditions = [
+			eq(email.userId, userId),
+			eq(email.isArchive, 1),
+			eq(email.isDel, isDel.NORMAL)
+		];
 
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.where(and(
-				eq(email.userId, userId),
-				eq(email.isArchive, 1),
-				eq(email.isDel, isDel.NORMAL)
-			)).get();
+		// 并行执行列表查询、总数查询和最新归档邮件查询
+		const [list, total, latestEmail] = await Promise.all([
+			orm(c)
+				.select({
+					...email,
+					starId: star.starId
+				})
+				.from(email)
+				.leftJoin(
+					star,
+					and(
+						eq(star.emailId, email.emailId),
+						eq(star.userId, userId)
+					)
+				)
+				.where(and(...conditions))
+				.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
+				.limit(size).all(),
+			orm(c).select({ total: count() }).from(email)
+				.where(and(...totalConditions)).get(),
+			orm(c).select().from(email)
+				.where(and(...totalConditions))
+				.orderBy(desc(email.emailId)).limit(1).get()
+		]);
 
 		list.forEach(item => {
 			item.isStar = item.starId != null ? 1 : 0;
@@ -955,18 +970,6 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
-		const total = await totalQuery;
-
-		// 获取最新归档邮件
-		const latestArchiveQuery = orm(c).select().from(email)
-			.where(and(
-				eq(email.userId, userId),
-				eq(email.isArchive, 1),
-				eq(email.isDel, isDel.NORMAL)
-			))
-			.orderBy(desc(email.emailId)).limit(1).get();
-
-		let latestEmail = await latestArchiveQuery;
 		if (!latestEmail) {
 			latestEmail = { emailId: 0, userId };
 		}
@@ -1008,37 +1011,40 @@ const emailService = {
 			conditions.push(lt(email.emailId, emailId));
 		}
 
-		const list = await orm(c)
-			.select({
-				...email,
-				starId: star.starId
-			})
-			.from(email)
-			.leftJoin(
-				star,
-				and(
-					eq(star.emailId, email.emailId),
-					eq(star.userId, userId)
-				)
-			)
-			.where(and(...conditions))
-			.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
-			.limit(size).all();
+		// 构建查询条件副本用于总数查询
+		const totalConditions = [
+			eq(email.userId, userId),
+			eq(email.isDel, isDel.NORMAL),
+			sql`(${email.subject} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.content} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.sendEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.toEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.name} COLLATE NOCASE LIKE ${'%' + keyword + '%'})`
+		];
 
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.where(and(
-				eq(email.userId, userId),
-				eq(email.isDel, isDel.NORMAL),
-				sql`(${email.subject} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.content} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.sendEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.toEmail} COLLATE NOCASE LIKE ${'%' + keyword + '%'} OR ${email.name} COLLATE NOCASE LIKE ${'%' + keyword + '%'})`
-			)).get();
+		// 并行执行列表查询和总数查询
+		const [list, total] = await Promise.all([
+			orm(c)
+				.select({
+					...email,
+					starId: star.starId
+				})
+				.from(email)
+				.leftJoin(
+					star,
+					and(
+						eq(star.emailId, email.emailId),
+						eq(star.userId, userId)
+					)
+				)
+				.where(and(...conditions))
+				.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
+				.limit(size).all(),
+			orm(c).select({ total: count() }).from(email)
+				.where(and(...totalConditions)).get()
+		]);
 
 		list.forEach(item => {
 			item.isStar = item.starId != null ? 1 : 0;
 		});
 
 		await this.emailAddAtt(c, list);
-
-		const total = await totalQuery;
 
 		return { list, total: total.total };
 	}

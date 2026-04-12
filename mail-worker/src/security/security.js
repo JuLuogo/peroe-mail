@@ -11,14 +11,14 @@ import app from '../hono/hono';
 const exclude = [
 	'/login',
 	'/register',
-	'/oss',
 	'/setting/websiteConfig',
 	'/webhooks',
 	'/init',
 	'/public/genToken',
 	'/telegram',
 	'/test',
-	'/oauth'
+	'/oauth/login',
+	'/oauth/linuxDo/callback'
 ];
 
 const requirePerms = [

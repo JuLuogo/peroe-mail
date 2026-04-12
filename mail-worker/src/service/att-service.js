@@ -14,8 +14,8 @@ const attService = {
 
 	async addAtt(c, attachments) {
 
-		for (let attachment of attachments) {
-
+		// 使用 Promise.all 并行上传所有附件到 R2
+		await Promise.all(attachments.map(async (attachment) => {
 			let metadate = {
 				contentType: attachment.mimeType,
 			}
@@ -28,8 +28,7 @@ const attService = {
 			}
 
 			await r2Service.putObj(c, attachment.key, attachment.content, metadate);
-
-		}
+		}));
 
 		await orm(c).insert(att).values(attachments).run();
 	},
@@ -155,16 +154,17 @@ const attService = {
 
 		await orm(c).insert(att).values(attDataList).run();
 
-		for (let att of attList) {
-			await r2Service.putObj(c, att.key, att.buff, {
-				contentType: att.type,
-				contentDisposition: `attachment;filename=${att.filename}`
-			});
-		}
+		// 使用 Promise.all 并行上传所有附件到 R2
+		await Promise.all(attList.map(att => r2Service.putObj(c, att.key, att.buff, {
+			contentType: att.type,
+			contentDisposition: `attachment;filename=${att.filename}`
+		})));
 
 	},
 
 	async saveArticleAtt(c, attDataList, userId, accountId, emailId) {
+
+		const validAttDataList = [];
 
 		for (let attData of attDataList) {
 			attData.userId = userId;
@@ -174,15 +174,19 @@ const attService = {
 			if (!attData.buff) {
 				continue;
 			}
-			await r2Service.putObj(c, attData.key, attData.buff, {
-				contentType: attData.mimeType,
-				cacheControl: `max-age=259200`,
-				contentDisposition: `inline;filename=${attData.filename}`
-			});
-			delete attData.buff;
+			validAttDataList.push(attData);
 		}
 
-		await orm(c).insert(att).values(attDataList).run();
+		// 使用 Promise.all 并行上传所有附件到 R2
+		await Promise.all(validAttDataList.map(attData => r2Service.putObj(c, attData.key, attData.buff, {
+			contentType: attData.mimeType,
+			cacheControl: `max-age=259200`,
+			contentDisposition: `inline;filename=${attData.filename}`
+		})));
+
+		// 清理 buff 字段后批量插入数据库
+		validAttDataList.forEach(attData => delete attData.buff);
+		await orm(c).insert(att).values(validAttDataList).run();
 
 	},
 

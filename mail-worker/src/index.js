@@ -17,24 +17,22 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
-		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
-			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
-		 }
-
 		return env.assets.fetch(req);
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
-		await verifyRecordService.clearRecord({ env })
-		await userService.resetDaySendCount({ env })
-		await emailService.completeReceiveAll({ env })
-		await oauthService.clearNoBindOathUser({ env })
+		await Promise.all([
+			verifyRecordService.clearRecord({ env }),
+			userService.resetDaySendCount({ env }),
+			emailService.completeReceiveAll({ env }),
+			oauthService.clearNoBindOathUser({ env })
+		])
 	},
 	// Cloudflare Queues 消费者
 	async queue(batch, env, ctx) {
 		const messages = batch.messages;
 
-		for (const message of messages) {
+		await Promise.all(messages.map(async (message) => {
 			try {
 				const result = await queueService.processEmailMessage(env, message.body);
 
@@ -49,6 +47,6 @@ export default {
 				console.error('[Queue] Unexpected error:', error);
 				message.retry({ delaySeconds: 60 });
 			}
-		}
+		}));
 	},
 };

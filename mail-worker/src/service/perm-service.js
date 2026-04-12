@@ -9,8 +9,11 @@ import { t } from '../i18n/i18n'
 
 const permService = {
 	async tree(c) {
-		const pList = await orm(c).select().from(perm).where(eq(perm.pid, 0)).orderBy(asc(perm.sort)).all();
-		const cList = await orm(c).select().from(perm).where(ne(perm.pid, 0)).orderBy(asc(perm.sort)).all();
+		// 使用 Promise.all 并行查询父级和子级权限
+		const [pList, cList] = await Promise.all([
+			orm(c).select().from(perm).where(eq(perm.pid, 0)).orderBy(asc(perm.sort)).all(),
+			orm(c).select().from(perm).where(ne(perm.pid, 0)).orderBy(asc(perm.sort)).all()
+		]);
 
 		cList.forEach(cItem => {
 			cItem.name = t('perms.' + cItem.name)

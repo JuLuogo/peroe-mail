@@ -14,13 +14,21 @@ import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
+import user from '../entity/user';
+import account from '../entity/account';
 
 const publicService = {
 
 	async emailList(c, params) {
 
-		let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type , isDel } = params
+		let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type , isDel, domain } = params
 
+		// 公共接口必须指定域名进行过滤，防止枚举全库邮件
+		if (!domain || !c.env.domain.includes(domain)) {
+			throw new BizError('必须提供有效的域名参数进行查询');
+		}
+
+		// 限制返回字段，不包含 content 和 text（防止敏感内容泄露）
 		const query = orm(c).select({
 				emailId: email.emailId,
 				sendEmail: email.sendEmail,
@@ -30,8 +38,6 @@ const publicService = {
 				toName: email.toName,
 				type: email.type,
 				createTime: email.createTime,
-				content: email.content,
-				text: email.text,
 				isDel: email.isDel,
 		}).from(email)
 
@@ -46,9 +52,18 @@ const publicService = {
 		size = Number(size);
 		num = Number(num);
 
+		// 限制最大返回数量，防止滥用
+		if (size > 50) {
+			size = 50;
+		}
+
 		num = (num - 1) * size;
 
 		let conditions = []
+
+		// 强制添加域名过滤条件，只允许查询属于配置域名的邮件
+		const domainCondition = sql`(${email.sendEmail} LIKE ${'%@' + domain} OR ${email.toEmail} LIKE ${'%@' + domain})`;
+		conditions.push(domainCondition);
 
 		if (toEmail) {
 			conditions.push(sql`${email.toEmail} COLLATE NOCASE LIKE ${toEmail}`)
@@ -66,9 +81,8 @@ const publicService = {
 			conditions.push(sql`${email.subject} COLLATE NOCASE LIKE ${subject}`)
 		}
 
-		if (content) {
-			conditions.push(sql`${email.content} COLLATE NOCASE LIKE ${content}`)
-		}
+		// 不再支持 content 全文搜索（该字段可能包含敏感内容）
+		// 如果需要搜索邮件内容，应该通过用户认证后的 API 访问
 
 		if (type || type === 0) {
 			conditions.push(eq(email.type, type))
@@ -135,21 +149,27 @@ const publicService = {
 				type = roleRow ? roleRow.roleId : type;
 			}
 
-			const userSql = `INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
-			VALUES ('${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}', '${device}', '${activeTime}', '${activeTime}')`
-
-			const accountSql = `INSERT INTO account (email, name, user_id)
-			VALUES ('${email}', '${emailUtils.getName(email)}', 0);`;
-
-			userList.push(c.env.db.prepare(userSql));
-			userList.push(c.env.db.prepare(accountSql));
-
+			userList.push({
+				email,
+				password: hash,
+				salt,
+				type,
+				os,
+				browser,
+				activeIp,
+				createIp: activeIp,
+				device,
+				activeTime,
+				createTime: activeTime
+			});
 		}
 
-		userList.push(c.env.db.prepare(`UPDATE account SET user_id = (SELECT user_id FROM user WHERE user.email = account.email) WHERE user_id = 0;`))
-
 		try {
-			await c.env.db.batch(userList);
+			// 使用 Drizzle ORM 批量插入，避免 SQL 注入
+			await orm(c).insert(user).values(userList).run();
+
+			// 更新 account 表，关联用户 ID
+			await c.env.db.prepare(`UPDATE account SET user_id = (SELECT user_id FROM user WHERE user.email = account.email) WHERE user_id = 0;`).run();
 		} catch (e) {
 			if(e.message.includes('SQLITE_CONSTRAINT')) {
 				throw new BizError(t('emailExistDatabase'))
