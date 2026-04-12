@@ -2,7 +2,7 @@ import orm from '../entity/orm';
 import { tgArchive } from '../entity/tg-archive';
 import { tgChannel } from '../entity/tg-channel';
 import { att } from '../entity/att';
-import { eq, and, lt, inArray, count, sql } from 'drizzle-orm';
+import { eq, and, lt, inArray, count } from 'drizzle-orm';
 import r2Service from './r2-service';
 import settingService from './setting-service';
 
