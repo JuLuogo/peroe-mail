@@ -1,6 +1,6 @@
 import emailUtils from '../utils/email-utils';
 
-export default function emailMsgTemplate(email, tgMsgTo, tgMsgFrom, tgMsgText) {
+export default function emailMsgTemplate(email, tgMsgTo, tgMsgFrom, tgMsgText, attachments, inlineImages) {
 
 	let template = `<b>${email.subject}</b>`
 
@@ -34,6 +34,25 @@ To：\u200B${email.toEmail}`
 		template += `
 
 ${text}`
+	}
+
+	// 如果有内嵌图片，显示图片数量（附件会在媒体组中显示，不需要单独列出）
+	if (inlineImages && inlineImages.length > 0) {
+		template += `
+
+🖼️ + ${inlineImages.length}`;
+	}
+
+	// 如果有普通附件，显示附件数量（附件会在媒体组中显示，不需要单独列出）
+	if (attachments && attachments.length > 0) {
+		const attSizeList = attachments.map(att => {
+			const size = att.size || 0;
+			const sizeStr = size < 1024 ? `${size}B` : (size < 1024 * 1024 ? `${(size / 1024).toFixed(1)}KB` : `${(size / (1024 * 1024)).toFixed(1)}MB`);
+			return `${att.filename} (${sizeStr})`;
+		});
+		template += `
+
+📎 ${attachments.length} ${attSizeList.join(', ')}`;
 	}
 
 	return template;
