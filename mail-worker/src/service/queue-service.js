@@ -143,6 +143,7 @@ const queueService = {
                     contentId: att.contentId,
                     url: r2Url,
                     size: content.length || content.byteLength,
+                    r2Key, // 用于后续清理
                 });
 
                 console.log(`[Queue] Uploaded attachment to R2: ${r2Key}, URL: ${r2Url}`);
@@ -397,11 +398,6 @@ const queueService = {
 
             console.log(`[Queue] ✅ Email sent successfully! MessageId: ${parsed.messageId}`);
 
-            // 发送成功后清理 R2 中的临时附件
-            if (hasAttachments) {
-                await this.cleanupR2Attachments(env, attachments);
-            }
-
             return {
                 success: true,
                 messageId: parsed.messageId,
@@ -413,6 +409,13 @@ const queueService = {
                 success: false,
                 error: error.message,
             };
+        } finally {
+            // 无论成功失败，都清理 R2 中的临时附件
+            // 成功时：邮件已发送，附件无用
+            // 失败时：邮件无法发送，附件更无用
+            if (hasAttachments) {
+                await this.cleanupR2Attachments(env, attachments);
+            }
         }
     },
 
