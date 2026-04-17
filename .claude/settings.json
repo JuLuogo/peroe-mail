@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"Cloud Mail\" d:/github/cloud-mail/*.md)"
+    ]
+  }
+}
