@@ -289,7 +289,7 @@ const telegramService = {
 						[
 							{
 								text: '查看',
-								web_app: { url: webAppUrl }
+								url: webAppUrl
 							}
 						]
 					]
